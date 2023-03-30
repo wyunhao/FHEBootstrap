@@ -291,7 +291,6 @@ void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphe
     //     Plaintext plainInd;
     //     batch_encoder.encode(intInd, plainInd);
     //     evaluator.add_inplace(ciphertext, tmp);
-
     // }
     Ciphertext temp_relin(context);
     for(int i = 0; i < 256; i++) {
@@ -374,6 +373,13 @@ Ciphertext encryptLWEskUnderBFV(const SEALContext& context, const size_t& degree
 vector<regevCiphertext> extractRLWECiphertextToLWECiphertext(Ciphertext& rlwe_ct, const int ring_dim = poly_modulus_degree_glb, const int n = 1024, const int p = 65537, const int big_prime = 268369921) {
     vector<regevCiphertext> results(ring_dim);
 
+    prng_seed_type seed;
+    for (auto &i : seed) {
+        i = random_uint64();
+    }
+    auto rng = std::make_shared<Blake2xbPRNGFactory>(Blake2xbPRNGFactory(seed));
+    RandomToStandardAdapter engine(rng->create());
+    uniform_int_distribution<uint32_t> dist(0, 100);
 
     for (int cnt = 0; cnt < ring_dim; cnt++) {
         results[cnt].a = NativeVector(n);
@@ -381,7 +387,7 @@ vector<regevCiphertext> extractRLWECiphertextToLWECiphertext(Ciphertext& rlwe_ct
         for (int i = cnt; i >= 0 && ind < n; i--) {
             float temp_f = ((float) rlwe_ct.data(1)[i]) * ((float) p) / ((float) big_prime);
             int decimal = (temp_f - ((int) temp_f)) * 100;
-            float rounding = (rand() % 100) < decimal ? 1 : 0;
+            float rounding = dist(engine) < decimal ? 1 : 0;
 
             long temp = ((int) (temp_f + rounding)) % p;
             results[cnt].a[ind] = temp < 0 ? p + temp : temp;
@@ -392,7 +398,7 @@ vector<regevCiphertext> extractRLWECiphertextToLWECiphertext(Ciphertext& rlwe_ct
         for (int i = ring_dim-1; i > ring_dim - n + cnt && ind < n; i--) {
             float temp_f = ((float) rlwe_ct.data(1)[i]) * ((float) p) / ((float) big_prime);
             int decimal = (temp_f - ((int) temp_f)) * 100;
-            float rounding = (rand() % 100) < decimal ? 1 : 0;
+            float rounding = dist(engine) < decimal ? 1 : 0;
 
             long temp = ((int) (temp_f + rounding)) % p;
             results[cnt].a[ind] = -temp < 0 ? p-temp : -temp;
@@ -402,7 +408,7 @@ vector<regevCiphertext> extractRLWECiphertextToLWECiphertext(Ciphertext& rlwe_ct
 
         float temp_f = ((float) rlwe_ct.data(0)[cnt]) * ((float) p) / ((float) big_prime);
         int decimal = temp_f - ((int) temp_f) * 100;
-        float rounding = (rand() % 100) < decimal ? 1 : 0;
+        float rounding = dist(engine) < decimal ? 1 : 0;
 
         long temp = ((int) (temp_f + rounding)) % p;
         results[cnt].b = temp % ((int) p);
