@@ -51,7 +51,7 @@ Ciphertext evaluatePackedLWECiphertext(const SEALContext& seal_context, vector<r
     vector<Ciphertext> result(sq_rt);
         
     for (int iter = 0; iter < sq_rt; iter++) {
-        for (int j = 0; j < lwe_sk_sqrt_list.size(); j++) {
+        for (int j = 0; j < (int) lwe_sk_sqrt_list.size(); j++) {
             vector<uint64_t> lwe_ct_tmp(degree);
             for (int i = 0; i < degree; i++) {
                 int ct_index = (i-iter) % (degree/2) < 0 ? (i-iter) % (degree/2) + degree/2 : (i-iter) % (degree/2);
@@ -78,7 +78,7 @@ Ciphertext evaluatePackedLWECiphertext(const SEALContext& seal_context, vector<r
         }
     }
 
-    for (int i = 0; i < result.size(); i++) {
+    for (int i = 0; i < (int) result.size(); i++) {
         evaluator.transform_from_ntt_inplace(result[i]);
     }
 
@@ -90,7 +90,7 @@ Ciphertext evaluatePackedLWECiphertext(const SEALContext& seal_context, vector<r
 
 
     vector<uint64_t> b_parts(degree);
-    for(size_t i = 0; i < degree; i++){
+    for(int i = 0; i < degree; i++){
         b_parts[i] = lwe_ct_list[i].b.ConvertToInt();
     }
 
@@ -187,7 +187,7 @@ Ciphertext slotToCoeff(const SEALContext& context, Ciphertext& encrypted, Cipher
 
     vector<Ciphertext> result(sq_rt);
     for (int iter = 0; iter < sq_rt; iter++) {
-        for (int j = 0; j < ct_sqrt_list.size(); j++) {
+        for (int j = 0; j < (int) ct_sqrt_list.size(); j++) {
             time_start = chrono::high_resolution_clock::now();
             vector<uint64_t> U_tmp = readUtemp(j*sq_rt + iter);
             time_end = chrono::high_resolution_clock::now();
@@ -227,7 +227,7 @@ Ciphertext slotToCoeff(const SEALContext& context, Ciphertext& encrypted, Cipher
         }
     }
 
-    for (int i = 0; i < result.size(); i++) {
+    for (int i = 0; i < (int) result.size(); i++) {
         evaluator.transform_from_ntt_inplace(result[i]);
     }
 
@@ -262,7 +262,7 @@ void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphe
     calUptoDegreeK(kToMCTs, kCTs[kCTs.size()-1], 256, relin_keys, context);
 
     for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < kCTs.size(); j++) {
+        for (int j = 0; j < (int) kCTs.size(); j++) {
             evaluator.mod_switch_to_next_inplace(kCTs[j]);
         }
     }
@@ -386,7 +386,7 @@ vector<regevCiphertext> extractRLWECiphertextToLWECiphertext(Ciphertext& rlwe_ct
         int ind = 0;
         for (int i = cnt; i >= 0 && ind < n; i--) {
             float temp_f = ((float) rlwe_ct.data(1)[i]) * ((float) p) / ((float) big_prime);
-            int decimal = (temp_f - ((int) temp_f)) * 100;
+            uint32_t decimal = (temp_f - ((int) temp_f)) * 100;
             float rounding = dist(engine) < decimal ? 1 : 0;
 
             long temp = ((int) (temp_f + rounding)) % p;
@@ -397,7 +397,7 @@ vector<regevCiphertext> extractRLWECiphertextToLWECiphertext(Ciphertext& rlwe_ct
 
         for (int i = ring_dim-1; i > ring_dim - n + cnt && ind < n; i--) {
             float temp_f = ((float) rlwe_ct.data(1)[i]) * ((float) p) / ((float) big_prime);
-            int decimal = (temp_f - ((int) temp_f)) * 100;
+            uint32_t decimal = (temp_f - ((int) temp_f)) * 100;
             float rounding = dist(engine) < decimal ? 1 : 0;
 
             long temp = ((int) (temp_f + rounding)) % p;
@@ -407,7 +407,7 @@ vector<regevCiphertext> extractRLWECiphertextToLWECiphertext(Ciphertext& rlwe_ct
         }
 
         float temp_f = ((float) rlwe_ct.data(0)[cnt]) * ((float) p) / ((float) big_prime);
-        int decimal = temp_f - ((int) temp_f) * 100;
+        uint32_t decimal = temp_f - ((int) temp_f) * 100;
         float rounding = dist(engine) < decimal ? 1 : 0;
 
         long temp = ((int) (temp_f + rounding)) % p;
@@ -421,7 +421,7 @@ vector<regevCiphertext> extractRLWECiphertextToLWECiphertext(Ciphertext& rlwe_ct
 int main() {
 
     ////////////////////////////////////////////// PREPARE (R)LWE PARAMS ///////////////////////////////////////////////
-    auto ring_dim = poly_modulus_degree_glb;
+    int ring_dim = poly_modulus_degree_glb;
     int n = 1024;
     int p = 65537;
 
