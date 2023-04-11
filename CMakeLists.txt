@@ -45,6 +45,6 @@ else()
     link_libraries( ${PALISADE_SHARED_LIBRARIES} )
 endif()
 
-add_executable( bootstrap bootstrap.cpp )
+add_executable( bootstrap LWEbootstrap.cpp )
 
 target_link_libraries(bootstrap SEAL::seal ntl m gmp)
