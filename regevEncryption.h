@@ -38,8 +38,12 @@ typedef vector<regevCiphertext> regevPK;
 
 regevSK regevGenerateSecretKey(const regevParam& param);
 regevPK regevGeneratePublicKey(const regevParam& param, const regevSK& sk);
+regevPK regevGeneratePublicKey_Mod3(const regevParam& param, const regevSK& sk);
 void regevEncSK(regevCiphertext& ct, const int& msg, const regevSK& sk, const regevParam& param, const bool& pk_gen = false);
+void regevEncSK_Mod3(regevCiphertext& ct, const int& msg, const regevSK& sk, const regevParam& param, const int enc_num);
 void regevEncPK(regevCiphertext& ct, const int& msg, const regevPK& pk, const regevParam& param);
+void regevDec(int& msg, const regevCiphertext& ct, const regevSK& sk, const regevParam& param);
+void regevDec_Mod3(int& msg, const regevCiphertext& ct, const regevSK& sk, const regevParam& param);
 
 /////////////////////////////////////////////////////////////////// Below are implementation
 
@@ -62,7 +66,7 @@ void regevEncSK(regevCiphertext& ct, const int& msg, const regevSK& sk, const re
     }
     ct.b.ModEq(q);
     if (add_half) {
-        ct.b.ModAddFastEq(q/2, q);
+        ct.b.ModAddFastEq(q/4, q);
     }
     if(!pk_gen)
         msg? ct.b.ModAddFastEq(3*q/4, q) : ct.b.ModAddFastEq(q/4, q);
@@ -70,10 +74,31 @@ void regevEncSK(regevCiphertext& ct, const int& msg, const regevSK& sk, const re
     ct.b.ModAddFastEq(m_dgg.GenerateInteger(q), q);
 }
 
-regevPK regevGeneratePublicKey(const regevParam& param, const regevSK& sk, const bool& add_half = false){
+void regevEncSK_Mod3(regevCiphertext& ct, const int& msg, const regevSK& sk, const regevParam& param, const int enc_num){
+    NativeInteger q = param.q;
+    int n = param.n;
+    DiscreteUniformGeneratorImpl<NativeVector> dug;
+    dug.SetModulus(q);
+    ct.a = dug.GenerateVector(n);
+    NativeInteger mu = q.ComputeMu();
+    for (int i = 0; i < n; ++i) {
+        ct.b += ct.a[i].ModMulFast(sk[i], q, mu);
+    }
+    ct.b.ModEq(q);
+    if (enc_num) {
+        ct.b.ModAddFastEq(q/3 * enc_num, q);
+    }
+    DiscreteGaussianGeneratorImpl<NativeVector> m_dgg(param.std_dev);
+    ct.b.ModAddFastEq(m_dgg.GenerateInteger(q), q);
+}
+
+
+regevPK regevGeneratePublicKey(const regevParam& param, const regevSK& sk, const bool& add_half = false, const bool& enc_one = false){
     regevPK pk(param.m);
     for(int i = 0; i < param.m; i++){
-        if (add_half && i%2 == 0) {
+        if (enc_one) { // all of the ciphertexts will encrypt one
+            regevEncSK(pk[i], 0, sk, param, true, true);
+        } else if (add_half && i%2 == 0) { // half of the encrypted ct will add q/4, which means it encrypts one
             regevEncSK(pk[i], 0, sk, param, true, true);
         } else {
             regevEncSK(pk[i], 0, sk, param, true, false);
@@ -81,6 +106,16 @@ regevPK regevGeneratePublicKey(const regevParam& param, const regevSK& sk, const
     }
     return pk;
 }
+
+
+regevPK regevGeneratePublicKey_Mod3(const regevParam& param, const regevSK& sk, const int enc_num = 0){
+    regevPK pk(param.m);
+    for(int i = 0; i < param.m; i++){
+        regevEncSK_Mod3(pk[i], 0, sk, param, enc_num);
+    }
+    return pk;
+}
+
 
 void regevEncPK(regevCiphertext& ct, const int& msg, const regevPK& pk, const regevParam& param){
     prng_seed_type seed;
@@ -105,3 +140,42 @@ void regevEncPK(regevCiphertext& ct, const int& msg, const regevPK& pk, const re
     msg? ct.b.ModAddFastEq(3*q/4, q) : ct.b.ModAddFastEq(q/4, q);
 }
 
+void regevDec(vector<int>& msg, const vector<regevCiphertext>& ct, const regevSK& sk, const regevParam& param){
+    msg.resize(ct.size());
+
+    int q = param.q;
+    int n = param.n;
+    NativeInteger inner(0);
+    for (int j = 0; j < ct.size(); j++) {
+        int r = ct[j].b.ConvertToInt();
+        for (int i = 0; i < n; ++i) {
+            r = (r - ct[j].a[i].ConvertToInt() * sk[i].ConvertToInt()) % q;
+        }
+        cout << r << " ";
+        msg[j] = (r >= 0 && r < 65537/4) || (r < 65537 && r > 65537-65537/4) ? 0 : 1;
+    }
+    cout << endl;
+}
+
+void regevDec_Mod3(vector<int>& msg, const vector<regevCiphertext>& ct, const regevSK& sk, const regevParam& param){
+    msg.resize(ct.size());
+
+    int q = param.q;
+    int n = param.n;
+    NativeInteger inner(0);
+    for (int j = 0; j < ct.size(); j++) {
+        int r = ct[j].b.ConvertToInt();
+        for (int i = 0; i < n; ++i) {
+            r = (r - ct[j].a[i].ConvertToInt() * sk[i].ConvertToInt()) % q;
+        }
+        cout << r << " ";
+        if ((r >= 0 && r < q/6) || (r < q && r > q-q/6)) {
+            msg[j] = 0;
+        } else if ((r >= q/6 && r < q/2)) {
+            msg[j] = 1;
+        } else {
+            msg[j] = 2;
+        }
+    }
+    cout << endl;
+}
