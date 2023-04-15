@@ -66,7 +66,7 @@ void regevEncSK(regevCiphertext& ct, const int& msg, const regevSK& sk, const re
     }
     ct.b.ModEq(q);
     if (add_half) {
-        ct.b.ModAddFastEq(q/4, q);
+        ct.b.ModAddFastEq(q/2, q);
     }
     if(!pk_gen)
         msg? ct.b.ModAddFastEq(3*q/4, q) : ct.b.ModAddFastEq(q/4, q);
@@ -146,7 +146,7 @@ void regevDec(vector<int>& msg, const vector<regevCiphertext>& ct, const regevSK
     int q = param.q;
     int n = param.n;
     NativeInteger inner(0);
-    for (int j = 0; j < ct.size(); j++) {
+    for (int j = 0; j < (int) ct.size(); j++) {
         int r = ct[j].b.ConvertToInt();
         for (int i = 0; i < n; ++i) {
             r = (r - ct[j].a[i].ConvertToInt() * sk[i].ConvertToInt()) % q;
@@ -163,7 +163,7 @@ void regevDec_Mod3(vector<int>& msg, const vector<regevCiphertext>& ct, const re
     int q = param.q;
     int n = param.n;
     NativeInteger inner(0);
-    for (int j = 0; j < ct.size(); j++) {
+    for (int j = 0; j < (int) ct.size(); j++) {
         int r = ct[j].b.ConvertToInt();
         for (int i = 0; i < n; ++i) {
             r = (r - ct[j].a[i].ConvertToInt() * sk[i].ConvertToInt()) % q;
