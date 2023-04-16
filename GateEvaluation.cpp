@@ -115,7 +115,7 @@ int main() {
     /////////////////////////////////////////////////// BOOTSTRAP //////////////////////////////////////////////////////
     bool gateEval = true;
     vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
-                                                       ring_dim, n, p, ksk, rangeCheckIndices_gateEvaluation, my_pool, p/3, gateEval);
+                                                       ring_dim, n, p, ksk, rangeCheckIndices_gateEvaluation, my_pool, bfv_secret_key, p/3, gateEval);
 
     regevDec_Mod3(msg, lwe_ct_results, lwe_sk, lwe_params);
     cout << "Actual NAND result: \n" << msg << endl;

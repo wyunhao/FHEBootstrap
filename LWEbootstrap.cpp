@@ -103,7 +103,7 @@ int main() {
     /////////////////////////////////////////////////////// BOOTSTRAP //////////////////////////////////////////////////
 
     vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
-                                                       ring_dim, n, p, ksk, rangeCheckIndices_bootstrap, my_pool);
+                                                       ring_dim, n, p, ksk, rangeCheckIndices_bootstrap, my_pool, bfv_secret_key);
 
     ///////////////////////////////////////////// DECRYPT AND VERIFY STATS /////////////////////////////////////////////
     
