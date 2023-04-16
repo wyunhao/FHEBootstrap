@@ -151,10 +151,8 @@ void regevDec(vector<int>& msg, const vector<regevCiphertext>& ct, const regevSK
         for (int i = 0; i < n; ++i) {
             r = (r - ct[j].a[i].ConvertToInt() * sk[i].ConvertToInt()) % q;
         }
-        cout << r << " ";
         msg[j] = (r >= 0 && r < 65537/4) || (r < 65537 && r > 65537-65537/4) ? 0 : 1;
     }
-    cout << endl;
 }
 
 void regevDec_Mod3(vector<int>& msg, const vector<regevCiphertext>& ct, const regevSK& sk, const regevParam& param){
@@ -168,7 +166,6 @@ void regevDec_Mod3(vector<int>& msg, const vector<regevCiphertext>& ct, const re
         for (int i = 0; i < n; ++i) {
             r = (r - ct[j].a[i].ConvertToInt() * sk[i].ConvertToInt()) % q;
         }
-        cout << r << " ";
         if ((r >= 0 && r < q/6) || (r < q && r > q-q/6)) {
             msg[j] = 0;
         } else if ((r >= q/6 && r < q/2)) {
@@ -177,5 +174,4 @@ void regevDec_Mod3(vector<int>& msg, const vector<regevCiphertext>& ct, const re
             msg[j] = 2;
         }
     }
-    cout << endl;
 }

@@ -10,116 +10,13 @@ using namespace seal;
 using namespace std;
 
 
-vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Ciphertext& lwe_sk_encrypted, const SEALContext& seal_context,
-                                  const RelinKeys& relin_keys, const GaloisKeys& gal_keys, const int ring_dim, const int n,
-                                  const int p, const KSwitchKeys& ksk, const MemoryPoolHandle& my_pool) {
-    chrono::high_resolution_clock::time_point time_start, time_end;
-    int total_preprocess = 0, total_online = 0;
-
-    Evaluator evaluator(seal_context);
-    BatchEncoder batch_encoder(seal_context);
-
-    int sq_sk = sqrt(n), sq_ct = sqrt(ring_dim/2);
-    vector<Ciphertext> lwe_sk_sqrt_list(sq_sk), ct_sqrt_list(2*sq_ct);
-
-    Ciphertext lwe_sk_column;
-
-    time_start = chrono::high_resolution_clock::now();
-    evaluator.rotate_columns(lwe_sk_encrypted, gal_keys, lwe_sk_column);
-    for (int i = 0; i < sq_sk; i++) {
-        evaluator.rotate_rows(lwe_sk_encrypted, sq_sk * i, gal_keys, lwe_sk_sqrt_list[i]);
-        evaluator.transform_to_ntt_inplace(lwe_sk_sqrt_list[i]);
-    }
-    time_end = chrono::high_resolution_clock::now();
-    total_preprocess += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
-
-
-    time_start = chrono::high_resolution_clock::now();
-    Ciphertext result = evaluatePackedLWECiphertext(seal_context, lwe_ct_list, lwe_sk_sqrt_list, gal_keys, n, ring_dim);
-    time_end = chrono::high_resolution_clock::now();
-    total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
-    cout << "TOTAL TIME for evaluation: " << total_online << endl;
-    // cout << "Noise: " << decryptor.invariant_noise_budget(result) << " bits\n";
-
-    Ciphertext range_check_res;
-    time_start = chrono::high_resolution_clock::now();
-    Bootstrap_RangeCheck_PatersonStockmeyer(range_check_res, result, rangeCheckIndices_bootstrap, p, ring_dim, relin_keys, seal_context);
-    time_end = chrono::high_resolution_clock::now();
-    total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
-    cout << "TOTAL TIME for rangecheck: " << total_online << endl;
-
-    ////////////////////////////////////////// SLOT TO COEFFICIENT /////////////////////////////////////////////////////
-
-    time_start = chrono::high_resolution_clock::now();
-    evaluator.mod_switch_to_next_inplace(range_check_res);
-    time_end = chrono::high_resolution_clock::now();
-    total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
-    // cout << "Noise after range check: " << decryptor.invariant_noise_budget(range_check_res) << " bits\n";
-
-    time_start = chrono::high_resolution_clock::now();
-    Ciphertext range_check_res_copy(range_check_res);
-
-    evaluator.rotate_columns_inplace(range_check_res_copy, gal_keys);
-    for (int i = 0; i < sq_ct; i++) {
-        evaluator.rotate_rows(range_check_res, sq_ct * i, gal_keys, ct_sqrt_list[i]);
-        evaluator.transform_to_ntt_inplace(ct_sqrt_list[i]);
-        evaluator.rotate_rows(range_check_res_copy, sq_ct * i, gal_keys, ct_sqrt_list[i+sq_ct]);
-        evaluator.transform_to_ntt_inplace(ct_sqrt_list[i+sq_ct]);
-    }
-
-    vector<Plaintext> U_plain_list(ring_dim);
-    for (int iter = 0; iter < sq_ct; iter++) {
-        for (int j = 0; j < (int) ct_sqrt_list.size(); j++) {
-            vector<uint64_t> U_tmp = readUtemp(j*sq_ct + iter);
-            batch_encoder.encode(U_tmp, U_plain_list[iter * ct_sqrt_list.size() + j]);
-            evaluator.transform_to_ntt_inplace(U_plain_list[iter * ct_sqrt_list.size() + j], ct_sqrt_list[j].parms_id());
-        }
-    }
-    time_end = chrono::high_resolution_clock::now();
-    total_preprocess += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
-
-    time_start = chrono::high_resolution_clock::now();
-    Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys, ring_dim);
-    time_end = chrono::high_resolution_clock::now();
-    total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
-    cout << "TOTAL TIME for slotToCoeff: " << total_online << endl;
-
-    ////////////////////////////////////////////////// KEY SWITCHING ///////////////////////////////////////////////////
-
-    time_start = chrono::high_resolution_clock::now();
-    while(seal_context.last_parms_id() != coeff.parms_id()){
-        evaluator.mod_switch_to_next_inplace(coeff);
-    }
-    // cout << "Noise before key switch: " << decryptor.invariant_noise_budget(coeff) << " bits\n";
-
-    Ciphertext copy_coeff = coeff;
-    auto ct_in_iter = util::iter(copy_coeff);
-    ct_in_iter += coeff.size() - 1;
-    seal::util::set_zero_poly(ring_dim, 1, coeff.data(1)); // notice that the coeff_mod.size() is hardcoded to 1, thus this needs to be performed on the last level
-
-    evaluator.switch_key_inplace(coeff, *ct_in_iter, static_cast<const KSwitchKeys &>(ksk), 0, my_pool);
-
-    // cout << "Noise before extraction: " << decryptor.invariant_noise_budget(coeff) << " bits\n";
-    
-    vector<regevCiphertext> lwe_ct_results = extractRLWECiphertextToLWECiphertext(coeff);
-    time_end = chrono::high_resolution_clock::now();
-    total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
-    cout << "TOTAL TIME for Extraction: " << total_online << endl;
-    cout << "TOTAL PREPROCESS TIME: " << total_preprocess << endl;
-    cout << "TOTAL ONLINE TIME: " << total_online << endl;
-
-    return lwe_ct_results;
-}
-
-
-
 int main() {
 
     ////////////////////////////////////////////// PREPARE (R)LWE PARAMS ///////////////////////////////////////////////
+    
     int ring_dim = poly_modulus_degree_glb;
     int n = 1024;
     int p = 65537;
-
 
     EncryptionParameters bfv_params(scheme_type::bfv);
     bfv_params.set_poly_modulus_degree(ring_dim);
@@ -187,12 +84,9 @@ int main() {
     // convert the BFV ternary sk into the new LWE key we should eventually switch to
     auto lwe_params = regevParam(n, p, 1.3, ring_dim); 
     auto lwe_sk = regevGenerateSecretKey(lwe_params);
-    cout << "***************************************** Ternary SK *****************************************\n";
     for (int i = 0; i < n; i++) {
         lwe_sk[i] = new_key.data()[i] > 65537 ? 65536 : new_key.data()[i];
-        cout << lwe_sk[i] << " ";
     }
-    cout << "\n**********************************************************************************************\n";
 
     seal::util::RNSIter new_key_rns(new_key.data().data(), ring_dim);
     ntt_negacyclic_harvey(new_key_rns, coeff_modulus.size(), seal_context.key_context_data()->small_ntt_tables());
@@ -204,156 +98,15 @@ int main() {
 
     // one switching key for one lwe_sk
     Ciphertext lwe_sk_encrypted = encryptLWEskUnderBFV(seal_context, ring_dim, bfv_public_key, bfv_secret_key, lwe_sk, lwe_params);
-    // cout << "Noise SK: " << decryptor.invariant_noise_budget(lwe_sk_encrypted) << " bits\n";
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    /////////////////////////////////////////////////////// BOOTSTRAP //////////////////////////////////////////////////
 
     vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
-                                                       ring_dim, n, p, ksk, my_pool);
+                                                       ring_dim, n, p, ksk, rangeCheckIndices_bootstrap, my_pool);
 
-
-
-
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // int sq_sk = sqrt(n), sq_ct = sqrt(ring_dim/2);
-    // vector<Ciphertext> lwe_sk_sqrt_list(sq_sk), ct_sqrt_list(2*sq_ct);
-
-    // chrono::high_resolution_clock::time_point time_start, time_end;
-    // int total_preprocess = 0, total_online = 0;
-
-    // Ciphertext lwe_sk_column;
-
-    // time_start = chrono::high_resolution_clock::now();
-    // evaluator.rotate_columns(lwe_sk_encrypted, gal_keys, lwe_sk_column);
-    // for (int i = 0; i < sq_sk; i++) {
-    //     evaluator.rotate_rows(lwe_sk_encrypted, sq_sk * i, gal_keys, lwe_sk_sqrt_list[i]);
-    //     evaluator.transform_to_ntt_inplace(lwe_sk_sqrt_list[i]);
-    // }
-    // time_end = chrono::high_resolution_clock::now();
-    // total_preprocess += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
-
-
-
-    // //////////////////////////////////////////// EVALUATION UNDER BFV ////////////////////////////////////////////////
-    // time_start = chrono::high_resolution_clock::now();
-    // Ciphertext result = evaluatePackedLWECiphertext(seal_context, lwe_ct_list, lwe_sk_sqrt_list, gal_keys, n, ring_dim);
-    // time_end = chrono::high_resolution_clock::now();
-    // total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
-    // cout << "TOTAL TIME for evaluation: " << total_online << endl;
-    // // cout << "Noise: " << decryptor.invariant_noise_budget(result) << " bits\n";
-
-    // Ciphertext range_check_res;
-    // time_start = chrono::high_resolution_clock::now();
-    // Bootstrap_RangeCheck_PatersonStockmeyer(range_check_res, result, rangeCheckIndices_bootstrap, p, ring_dim, relin_keys, seal_context);
-    // time_end = chrono::high_resolution_clock::now();
-    // total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
-    // cout << "TOTAL TIME for rangecheck: " << total_online << endl;
-
-    // ////////////////////////////////////////// SLOT TO COEFFICIENT /////////////////////////////////////////////////////
-
-    // time_start = chrono::high_resolution_clock::now();
-    // evaluator.mod_switch_to_next_inplace(range_check_res);
-    // time_end = chrono::high_resolution_clock::now();
-    // total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
-    // // cout << "Noise after range check: " << decryptor.invariant_noise_budget(range_check_res) << " bits\n";
-
-    // time_start = chrono::high_resolution_clock::now();
-    // Ciphertext range_check_res_copy(range_check_res);
-
-    // evaluator.rotate_columns_inplace(range_check_res_copy, gal_keys);
-    // for (int i = 0; i < sq_ct; i++) {
-    //     evaluator.rotate_rows(range_check_res, sq_ct * i, gal_keys, ct_sqrt_list[i]);
-    //     evaluator.transform_to_ntt_inplace(ct_sqrt_list[i]);
-    //     evaluator.rotate_rows(range_check_res_copy, sq_ct * i, gal_keys, ct_sqrt_list[i+sq_ct]);
-    //     evaluator.transform_to_ntt_inplace(ct_sqrt_list[i+sq_ct]);
-    // }
-
-    // vector<Plaintext> U_plain_list(ring_dim);
-    // for (int iter = 0; iter < sq_ct; iter++) {
-    //     for (int j = 0; j < (int) ct_sqrt_list.size(); j++) {
-    //         vector<uint64_t> U_tmp = readUtemp(j*sq_ct + iter);
-    //         batch_encoder.encode(U_tmp, U_plain_list[iter * ct_sqrt_list.size() + j]);
-    //         evaluator.transform_to_ntt_inplace(U_plain_list[iter * ct_sqrt_list.size() + j], ct_sqrt_list[j].parms_id());
-    //     }
-    // }
-    // time_end = chrono::high_resolution_clock::now();
-    // total_preprocess += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
-
-    // time_start = chrono::high_resolution_clock::now();
-    // Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys, ring_dim);
-    // time_end = chrono::high_resolution_clock::now();
-    // total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
-    // cout << "TOTAL TIME for slotToCoeff: " << total_online << endl;
-
-    // Plaintext t;
-    // cout << "Coeff decoded: ";
-    // decryptor.decrypt(coeff, t);
-    // for (int i = 0; i < ring_dim; i++) {
-    //     cout << t[i] << " ";
-    // }
-    // cout << endl;
-
-    // ////////////////////////////////////////////////// KEY SWITCHING ///////////////////////////////////////////////////
-
-    // time_start = chrono::high_resolution_clock::now();
-    // while(seal_context.last_parms_id() != coeff.parms_id()){
-    //     evaluator.mod_switch_to_next_inplace(coeff);
-    // }
-    // // cout << "Noise before key switch: " << decryptor.invariant_noise_budget(coeff) << " bits\n";
-
-    // Ciphertext copy_coeff = coeff;
-    // auto ct_in_iter = util::iter(copy_coeff);
-    // ct_in_iter += coeff.size() - 1;
-    // seal::util::set_zero_poly(ring_dim, 1, coeff.data(1)); // notice that the coeff_mod.size() is hardcoded to 1, thus this needs to be performed on the last level
-
-    // evaluator.switch_key_inplace(coeff, *ct_in_iter, static_cast<const KSwitchKeys &>(ksk), 0, my_pool);
-
-    // // cout << "Noise before extraction: " << decryptor.invariant_noise_budget(coeff) << " bits\n";
+    ///////////////////////////////////////////// DECRYPT AND VERIFY STATS /////////////////////////////////////////////
     
-    // vector<regevCiphertext> lwe_ct_results = extractRLWECiphertextToLWECiphertext(coeff);
-    // time_end = chrono::high_resolution_clock::now();
-    // total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
-    // cout << "TOTAL TIME for Extraction: " << total_online << endl;
-    // cout << "TOTAL PREPROCESS TIME: " << total_preprocess << endl;
-    // cout << "TOTAL ONLINE TIME: " << total_online << endl;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     vector<uint64_t> stats(100, 0);
     for (int i = 0; i < ring_dim; i++) {
         int temp = 0;

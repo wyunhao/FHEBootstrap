@@ -86,8 +86,9 @@ inline void calUptoDegreeK(vector<Ciphertext>& output, const Ciphertext& input, 
 
 
 // assume lwe_sk_len is a power of 2, and has a square root
-Ciphertext evaluatePackedLWECiphertext(const SEALContext& seal_context, vector<regevCiphertext>& lwe_ct_list, const vector<Ciphertext>& lwe_sk_sqrt_list,
-                                       const GaloisKeys& gal_keys, const int lwe_sk_len, const int degree = poly_modulus_degree_glb) {
+Ciphertext evaluatePackedLWECiphertext(const SEALContext& seal_context, vector<regevCiphertext>& lwe_ct_list,
+                                       const vector<Ciphertext>& lwe_sk_sqrt_list, const GaloisKeys& gal_keys, const int lwe_sk_len,
+                                       const int degree = poly_modulus_degree_glb, const bool gateEval = false, const int q = 65537) {
     Evaluator evaluator(seal_context);
     BatchEncoder batch_encoder(seal_context);
 
@@ -139,6 +140,13 @@ Ciphertext evaluatePackedLWECiphertext(const SEALContext& seal_context, vector<r
     batch_encoder.encode(b_parts, lwe_b_pl);
     evaluator.negate_inplace(result[0]);
     evaluator.add_plain_inplace(result[0], lwe_b_pl);
+
+    if (gateEval) {
+        vector<uint64_t> q_shift_constant(degree, -q/6);
+        Plaintext q_shift_pl;
+        batch_encoder.encode(q_shift_constant, q_shift_pl);
+        evaluator.add_plain_inplace(result[0], q_shift_pl);
+    }
 
     return result[0];
 }
@@ -477,4 +485,122 @@ vector<regevCiphertext> extractRLWECiphertextToLWECiphertext_NoModSwitch(Ciphert
     }
 
     return results;
+}
+
+
+vector<regevCiphertext> preprocess_NAND(const vector<regevCiphertext>& ct_list_1, const vector<regevCiphertext>& ct_list_2,
+                                        const regevParam& params) {
+
+    vector<regevCiphertext> result(ct_list_1.size());
+    
+    for (int i = 0; i < ct_list_1.size(); i++) {
+        result[i].a = NativeVector(params.n);
+        for (int j = 0; j < params.n; j++) {
+            result[i].a[j] = (ct_list_1[i].a[j].ConvertToInt() + ct_list_2[i].a[j].ConvertToInt()) % params.q;
+        }
+        result[i].b = (ct_list_1[i].b.ConvertToInt() + ct_list_2[i].b.ConvertToInt()) % params.q;
+    }
+    return result;
+}
+
+
+vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Ciphertext& lwe_sk_encrypted, const SEALContext& seal_context,
+                                  const RelinKeys& relin_keys, const GaloisKeys& gal_keys, const int ring_dim, const int n,
+                                  const int p, const KSwitchKeys& ksk, const vector<uint64_t>& rangeCheckIndices,
+                                  const MemoryPoolHandle& my_pool, const bool gateEval = false) {
+    chrono::high_resolution_clock::time_point time_start, time_end;
+    int total_preprocess = 0, total_online = 0;
+
+    Evaluator evaluator(seal_context);
+    BatchEncoder batch_encoder(seal_context);
+
+    int sq_sk = sqrt(n), sq_ct = sqrt(ring_dim/2);
+    vector<Ciphertext> lwe_sk_sqrt_list(sq_sk), ct_sqrt_list(2*sq_ct);
+
+    Ciphertext lwe_sk_column;
+
+    time_start = chrono::high_resolution_clock::now();
+    evaluator.rotate_columns(lwe_sk_encrypted, gal_keys, lwe_sk_column);
+    for (int i = 0; i < sq_sk; i++) {
+        evaluator.rotate_rows(lwe_sk_encrypted, sq_sk * i, gal_keys, lwe_sk_sqrt_list[i]);
+        evaluator.transform_to_ntt_inplace(lwe_sk_sqrt_list[i]);
+    }
+    time_end = chrono::high_resolution_clock::now();
+    total_preprocess += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
+
+    time_start = chrono::high_resolution_clock::now();
+    Ciphertext result = evaluatePackedLWECiphertext(seal_context, lwe_ct_list, lwe_sk_sqrt_list, gal_keys, n, ring_dim, gateEval);
+    time_end = chrono::high_resolution_clock::now();
+    total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
+    cout << "TOTAL TIME for evaluation: " << total_online << endl;
+    // cout << "Noise: " << decryptor.invariant_noise_budget(result) << " bits\n";
+
+    Ciphertext range_check_res;
+    time_start = chrono::high_resolution_clock::now();
+    Bootstrap_RangeCheck_PatersonStockmeyer(range_check_res, result, rangeCheckIndices, p, ring_dim, relin_keys, seal_context);
+    time_end = chrono::high_resolution_clock::now();
+    total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
+    cout << "TOTAL TIME for rangecheck: " << total_online << endl;
+
+    ////////////////////////////////////////// SLOT TO COEFFICIENT /////////////////////////////////////////////////////
+
+    time_start = chrono::high_resolution_clock::now();
+    evaluator.mod_switch_to_next_inplace(range_check_res);
+    time_end = chrono::high_resolution_clock::now();
+    total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
+    // cout << "Noise after range check: " << decryptor.invariant_noise_budget(range_check_res) << " bits\n";
+
+    time_start = chrono::high_resolution_clock::now();
+    Ciphertext range_check_res_copy(range_check_res);
+
+    evaluator.rotate_columns_inplace(range_check_res_copy, gal_keys);
+    for (int i = 0; i < sq_ct; i++) {
+        evaluator.rotate_rows(range_check_res, sq_ct * i, gal_keys, ct_sqrt_list[i]);
+        evaluator.transform_to_ntt_inplace(ct_sqrt_list[i]);
+        evaluator.rotate_rows(range_check_res_copy, sq_ct * i, gal_keys, ct_sqrt_list[i+sq_ct]);
+        evaluator.transform_to_ntt_inplace(ct_sqrt_list[i+sq_ct]);
+    }
+
+    vector<Plaintext> U_plain_list(ring_dim);
+    for (int iter = 0; iter < sq_ct; iter++) {
+        for (int j = 0; j < (int) ct_sqrt_list.size(); j++) {
+            vector<uint64_t> U_tmp = readUtemp(j*sq_ct + iter);
+            batch_encoder.encode(U_tmp, U_plain_list[iter * ct_sqrt_list.size() + j]);
+            evaluator.transform_to_ntt_inplace(U_plain_list[iter * ct_sqrt_list.size() + j], ct_sqrt_list[j].parms_id());
+        }
+    }
+    time_end = chrono::high_resolution_clock::now();
+    total_preprocess += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
+
+    time_start = chrono::high_resolution_clock::now();
+    Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys, ring_dim);
+    time_end = chrono::high_resolution_clock::now();
+    total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
+    cout << "TOTAL TIME for slotToCoeff: " << total_online << endl;
+
+    ////////////////////////////////////////////////// KEY SWITCHING ///////////////////////////////////////////////////
+
+    time_start = chrono::high_resolution_clock::now();
+    while(seal_context.last_parms_id() != coeff.parms_id()){
+        evaluator.mod_switch_to_next_inplace(coeff);
+    }
+    // cout << "Noise before key switch: " << decryptor.invariant_noise_budget(coeff) << " bits\n";
+
+    Ciphertext copy_coeff = coeff;
+    auto ct_in_iter = util::iter(copy_coeff);
+    ct_in_iter += coeff.size() - 1;
+    seal::util::set_zero_poly(ring_dim, 1, coeff.data(1)); // notice that the coeff_mod.size() is hardcoded to 1, thus this needs to be performed on the last level
+
+    evaluator.switch_key_inplace(coeff, *ct_in_iter, static_cast<const KSwitchKeys &>(ksk), 0, my_pool);
+
+    // cout << "Noise before extraction: " << decryptor.invariant_noise_budget(coeff) << " bits\n";
+    
+    vector<regevCiphertext> lwe_ct_results = extractRLWECiphertextToLWECiphertext(coeff);
+    time_end = chrono::high_resolution_clock::now();
+    total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
+    cout << "TOTAL TIME for Extraction: " << total_online << endl;
+    cout << "TOTAL PREPROCESS TIME: " << total_preprocess << endl;
+    cout << "TOTAL ONLINE TIME: " << total_online << endl;
+
+    return lwe_ct_results;
 }

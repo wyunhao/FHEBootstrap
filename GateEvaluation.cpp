@@ -12,10 +12,11 @@ using namespace std;
 
 int main() {
 
+
+    ////////////////////////////////////////////// PREPARE (R)LWE PARAMS ///////////////////////////////////////////////
     int ring_dim = poly_modulus_degree_glb;
     int n = 1024;
     int p = 65537;
-
 
     EncryptionParameters bfv_params(scheme_type::bfv);
     bfv_params.set_poly_modulus_degree(ring_dim);
@@ -34,7 +35,6 @@ int main() {
 
     SEALContext seal_context(bfv_params, true, sec_level_type::none);
     cout << "primitive root: " << seal_context.first_context_data()->plain_ntt_tables()->get_root() << endl;
-
 
     KeyGenerator new_key_keygen(seal_context, n);
     SecretKey new_key = new_key_keygen.secret_key();
@@ -78,64 +78,45 @@ int main() {
     keygen.create_galois_keys(rot_steps, gal_keys);
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+    ////////////////////////////////////////////// PREPARE LWE CIPHERTEXT //////////////////////////////////////////////
+    
+    // 32*32 = 1024
+    // convert the BFV ternary sk into the new LWE key we should eventually switch to
     auto lwe_params = regevParam(n, p, 1.3, ring_dim); 
     auto lwe_sk = regevGenerateSecretKey(lwe_params);
-    Ciphertext lwe_sk_encrypted = encryptLWEskUnderBFV(seal_context, ring_dim, bfv_public_key, bfv_secret_key, lwe_sk, lwe_params);
-
-    vector<int> msg;
-
-    vector<regevCiphertext> lwe_ct_list = regevGeneratePublicKey_Mod3(lwe_params, lwe_sk, 2); // enc 1
-
-
-    int sq_sk = sqrt(n), sq_ct = sqrt(ring_dim/2);
-    vector<Ciphertext> lwe_sk_sqrt_list(sq_sk), ct_sqrt_list(2*sq_ct);
-
-    Ciphertext lwe_sk_column;
-
-    evaluator.rotate_columns(lwe_sk_encrypted, gal_keys, lwe_sk_column);
-    for (int i = 0; i < sq_sk; i++) {
-        evaluator.rotate_rows(lwe_sk_encrypted, sq_sk * i, gal_keys, lwe_sk_sqrt_list[i]);
-        evaluator.transform_to_ntt_inplace(lwe_sk_sqrt_list[i]);
+    for (int i = 0; i < n; i++) {
+        lwe_sk[i] = new_key.data()[i] > p ? p-1 : new_key.data()[i];
     }
 
+    seal::util::RNSIter new_key_rns(new_key.data().data(), ring_dim);
+    ntt_negacyclic_harvey(new_key_rns, coeff_modulus.size(), seal_context.key_context_data()->small_ntt_tables());
+
+    vector<int> msg(ring_dim);
+
+    vector<regevCiphertext> lwe_ct_list_1 = regevGeneratePublicKey_Mod3(lwe_params, lwe_sk, 0); // enc 0
+    vector<regevCiphertext> lwe_ct_list_2 = regevGeneratePublicKey_Mod3(lwe_params, lwe_sk, 1); // enc 1
+
+    // regevDec_Mod3(msg, lwe_ct_list_1, lwe_sk, lwe_params);
+    // cout << "Input Ciphertex 1: \n" << msg << endl;
+    // regevDec_Mod3(msg, lwe_ct_list_2, lwe_sk, lwe_params);
+    // cout << "Input Ciphertex 2: \n" << msg << endl;
+
+    vector<regevCiphertext> lwe_ct_list = preprocess_NAND(lwe_ct_list_1, lwe_ct_list_2, lwe_params);
+
+    // regevDec_Mod3(msg, lwe_ct_list, lwe_sk, lwe_params);
+    // cout << "Expected NAND result: \n" << msg << endl;
+
+    ////////////////////////////////////////////// ENCRYPT SK UNDER BFV ////////////////////////////////////////////////
+
+    // one switching key for one lwe_sk
+    Ciphertext lwe_sk_encrypted = encryptLWEskUnderBFV(seal_context, ring_dim, bfv_public_key, bfv_secret_key, lwe_sk, lwe_params);
 
 
+    /////////////////////////////////////////////////// BOOTSTRAP //////////////////////////////////////////////////////
+    bool gateEval = true;
+    vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
+                                                       ring_dim, n, p, ksk, rangeCheckIndices_gateEvaluation, my_pool, gateEval);
 
-
-
-    Ciphertext result = evaluatePackedLWECiphertext(seal_context, lwe_ct_list, lwe_sk_sqrt_list, gal_keys, n, ring_dim);
-
-    Ciphertext range_check_res;
-    // f(0) = 1
-    Bootstrap_RangeCheck_PatersonStockmeyer(range_check_res, result, rangeCheckIndices_gateEvaluation, p, ring_dim, relin_keys, seal_context, 65537/3);
-
-
-
-
-    Plaintext pl;
-    vector<uint64_t> v(ring_dim);
-
-    decryptor.decrypt(range_check_res, pl);
-    batch_encoder.decode(pl, v);
-
-    cout << "Decrypted after rangeCheck:\n";
-    cout << v << endl;
-    
-
-
-
-
+    regevDec_Mod3(msg, lwe_ct_results, lwe_sk, lwe_params);
+    cout << "Actual NAND result: \n" << msg << endl;
 }
