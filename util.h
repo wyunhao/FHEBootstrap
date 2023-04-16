@@ -250,7 +250,7 @@ Ciphertext slotToCoeff(const SEALContext& context, vector<Ciphertext>& ct_sqrt_l
  * @param degree 
  * @return Ciphertext 
  */
-Ciphertext slotToCoeff(const SEALContext& context, vector<Ciphertext>& ct_sqrt_list, const GaloisKeys& gal_keys, const int degree=poly_modulus_degree_glb) {
+Ciphertext slotToCoeff_WOPrepreocess(const SEALContext& context, vector<Ciphertext>& ct_sqrt_list, const GaloisKeys& gal_keys, const int degree=poly_modulus_degree_glb) {
     Evaluator evaluator(context);
     BatchEncoder batch_encoder(context);
     vector<vector<int>> U = generateMatrixU_transpose(degree);
@@ -545,12 +545,11 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
     cout << "TOTAL TIME for evaluation: " << total_online << endl;
     // cout << "Noise: " << decryptor.invariant_noise_budget(result) << " bits\n";
 
-    Plaintext pl;
-    vector<uint64_t> v(ring_dim);
-    decryptor.decrypt(result, pl);
-    batch_encoder.decode(pl, v);
-
-    cout << "Decrypt after evaluation: \n" << v << endl;
+    // Plaintext pl;
+    // vector<uint64_t> v(ring_dim);
+    // decryptor.decrypt(result, pl);
+    // batch_encoder.decode(pl, v);
+    // cout << "Decrypt after evaluation: \n" << v << endl;
 
     Ciphertext range_check_res;
     time_start = chrono::high_resolution_clock::now();
@@ -559,11 +558,9 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for rangecheck: " << total_online << endl;
 
-    
-    decryptor.decrypt(range_check_res, pl);
-    batch_encoder.decode(pl, v);
-
-    cout << "Decrypt after rangeCheck: \n" << v << endl;
+    // decryptor.decrypt(range_check_res, pl);
+    // batch_encoder.decode(pl, v);
+    // cout << "Decrypt after rangeCheck: \n" << v << endl;
 
     ////////////////////////////////////////// SLOT TO COEFFICIENT /////////////////////////////////////////////////////
 
@@ -571,7 +568,7 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
     evaluator.mod_switch_to_next_inplace(range_check_res);
     time_end = chrono::high_resolution_clock::now();
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
-    cout << "Noise after range check: " << decryptor.invariant_noise_budget(range_check_res) << " bits\n";
+    // cout << "Noise after range check: " << decryptor.invariant_noise_budget(range_check_res) << " bits\n";
 
     time_start = chrono::high_resolution_clock::now();
     Ciphertext range_check_res_copy(range_check_res);
@@ -607,7 +604,7 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
     while(seal_context.last_parms_id() != coeff.parms_id()){
         evaluator.mod_switch_to_next_inplace(coeff);
     }
-    cout << "Noise before key switch: " << decryptor.invariant_noise_budget(coeff) << " bits\n";
+    // cout << "Noise before key switch: " << decryptor.invariant_noise_budget(coeff) << " bits\n";
 
     Ciphertext copy_coeff = coeff;
     auto ct_in_iter = util::iter(copy_coeff);
@@ -625,6 +622,5 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
     cout << "TOTAL PREPROCESS TIME: " << total_preprocess << endl;
     cout << "TOTAL ONLINE TIME: " << total_online << endl;
 
-    vector<regevCiphertext> lwe_ct_results;
     return lwe_ct_results;
 }

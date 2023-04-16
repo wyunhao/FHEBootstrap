@@ -36,7 +36,6 @@ int main() {
     SEALContext seal_context(bfv_params, true, sec_level_type::none);
     cout << "primitive root: " << seal_context.first_context_data()->plain_ntt_tables()->get_root() << endl;
 
-
     KeyGenerator new_key_keygen(seal_context, n);
     SecretKey new_key = new_key_keygen.secret_key();
     inverse_ntt_negacyclic_harvey(new_key.data().data(), seal_context.key_context_data()->small_ntt_tables()[0]);
@@ -85,14 +84,13 @@ int main() {
     auto lwe_params = regevParam(n, p, 1.3, ring_dim); 
     auto lwe_sk = regevGenerateSecretKey(lwe_params);
     for (int i = 0; i < n; i++) {
-        lwe_sk[i] = new_key.data()[i] > 65537 ? 65536 : new_key.data()[i];
+        lwe_sk[i] = new_key.data()[i] > p ? p-1 : new_key.data()[i];
     }
 
     seal::util::RNSIter new_key_rns(new_key.data().data(), ring_dim);
     ntt_negacyclic_harvey(new_key_rns, coeff_modulus.size(), seal_context.key_context_data()->small_ntt_tables());
 
     vector<regevCiphertext> lwe_ct_list = regevGeneratePublicKey(lwe_params, lwe_sk, true);
-
 
     ////////////////////////////////////////////// ENCRYPT SK UNDER BFV ////////////////////////////////////////////////
 
