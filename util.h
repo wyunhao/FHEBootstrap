@@ -311,8 +311,9 @@ Ciphertext slotToCoeff(const SEALContext& context, vector<Ciphertext>& ct_sqrt_l
 }
 
 
-void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphertext& input, const vector<uint64_t>& rangeCheckIndices, int modulus,
-                                             const size_t& degree, const RelinKeys &relin_keys, const SEALContext& context, const int f_zero = 0) {
+void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphertext& input, const vector<uint64_t>& rangeCheckIndices,
+                                             int modulus, const size_t& degree, const RelinKeys &relin_keys, const SEALContext& context,
+                                             const int f_zero = 0, const bool gateEval = false) {
     MemoryPoolHandle my_pool_larger = MemoryPoolHandle::New(true);
     auto old_prof_larger = MemoryManager::SwitchProfile(std::make_unique<MMProfFixed>(std::move(my_pool_larger)));
 
@@ -359,22 +360,24 @@ void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphe
             evaluator.add_inplace(temp_relin, levelSum);
         }
     }
-
-    evaluator.relinearize_inplace(temp_relin, relin_keys);
-    evaluator.add_inplace(ciphertext, temp_relin);
-
-    vector<uint64_t> intInd(degree, f_zero); 
-    Plaintext plainInd;
-    Ciphertext temp;
-    batch_encoder.encode(intInd, plainInd);
-    evaluator.negate_inplace(ciphertext);
-    evaluator.add_plain_inplace(ciphertext, plainInd);
-    temp.release();
-    temp_relin.release();
     for(int i = 0; i < 256; i++){
         kCTs[i].release();
         kToMCTs[i].release();
     }
+
+    evaluator.relinearize_inplace(temp_relin, relin_keys);
+    evaluator.add_inplace(ciphertext, temp_relin);
+    temp_relin.release();
+
+    if (!gateEval) {
+        vector<uint64_t> intInd(degree, f_zero); 
+        Plaintext plainInd;
+        Ciphertext temp;
+        batch_encoder.encode(intInd, plainInd);
+        evaluator.negate_inplace(ciphertext);
+        evaluator.add_plain_inplace(ciphertext, plainInd);
+    }
+    
     MemoryManager::SwitchProfile(std::move(old_prof_larger));
 }
 
@@ -493,7 +496,7 @@ vector<regevCiphertext> preprocess_NAND(const vector<regevCiphertext>& ct_list_1
 
     vector<regevCiphertext> result(ct_list_1.size());
     
-    for (int i = 0; i < ct_list_1.size(); i++) {
+    for (int i = 0; i < (int) ct_list_1.size(); i++) {
         result[i].a = NativeVector(params.n);
         for (int j = 0; j < params.n; j++) {
             result[i].a[j] = (ct_list_1[i].a[j].ConvertToInt() + ct_list_2[i].a[j].ConvertToInt()) % params.q;
@@ -507,7 +510,7 @@ vector<regevCiphertext> preprocess_NAND(const vector<regevCiphertext>& ct_list_1
 vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Ciphertext& lwe_sk_encrypted, const SEALContext& seal_context,
                                   const RelinKeys& relin_keys, const GaloisKeys& gal_keys, const int ring_dim, const int n,
                                   const int p, const KSwitchKeys& ksk, const vector<uint64_t>& rangeCheckIndices,
-                                  const MemoryPoolHandle& my_pool, const bool gateEval = false) {
+                                  const MemoryPoolHandle& my_pool, const int f_zero = 0, const bool gateEval = false) {
     chrono::high_resolution_clock::time_point time_start, time_end;
     int total_preprocess = 0, total_online = 0;
 
@@ -537,7 +540,7 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
 
     Ciphertext range_check_res;
     time_start = chrono::high_resolution_clock::now();
-    Bootstrap_RangeCheck_PatersonStockmeyer(range_check_res, result, rangeCheckIndices, p, ring_dim, relin_keys, seal_context);
+    Bootstrap_RangeCheck_PatersonStockmeyer(range_check_res, result, rangeCheckIndices, p, ring_dim, relin_keys, seal_context, f_zero, gateEval);
     time_end = chrono::high_resolution_clock::now();
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for rangecheck: " << total_online << endl;
