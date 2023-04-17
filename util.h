@@ -91,7 +91,8 @@ inline void calUptoDegreeK(vector<Ciphertext>& output, const Ciphertext& input, 
 // assume lwe_sk_len is a power of 2, and has a square root
 Ciphertext evaluatePackedLWECiphertext(const SEALContext& seal_context, vector<regevCiphertext>& lwe_ct_list,
                                        const vector<Ciphertext>& lwe_sk_sqrt_list, const GaloisKeys& gal_keys, const int lwe_sk_len,
-                                       const int degree = poly_modulus_degree_glb, const bool gateEval = false, const int q = 65537) {
+                                       const vector<uint64_t>& q_shift_constant, const int degree = poly_modulus_degree_glb,
+                                       const bool gateEval = false, const int q = 65537) {
     Evaluator evaluator(seal_context);
     BatchEncoder batch_encoder(seal_context);
 
@@ -145,7 +146,6 @@ Ciphertext evaluatePackedLWECiphertext(const SEALContext& seal_context, vector<r
     evaluator.add_plain_inplace(result[0], lwe_b_pl);
 
     if (gateEval) {
-        vector<uint64_t> q_shift_constant(degree, -q/6);
         Plaintext q_shift_pl;
         batch_encoder.encode(q_shift_constant, q_shift_pl);
         evaluator.add_plain_inplace(result[0], q_shift_pl);
@@ -524,7 +524,7 @@ vector<regevCiphertext> preprocess_NAND(const vector<regevCiphertext>& ct_list_1
 vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Ciphertext& lwe_sk_encrypted, const SEALContext& seal_context,
                                   const RelinKeys& relin_keys, const GaloisKeys& gal_keys, const int ring_dim, const int n,
                                   const int p, const KSwitchKeys& ksk, const vector<uint64_t>& rangeCheckIndices,
-                                  const MemoryPoolHandle& my_pool, const SecretKey& bfv_secret_key,
+                                  const MemoryPoolHandle& my_pool, const SecretKey& bfv_secret_key, const vector<uint64_t>& q_shift_constant,
                                   const int f_zero = 0, const bool gateEval = false) {
     chrono::high_resolution_clock::time_point time_start, time_end;
     int total_preprocess = 0, total_online = 0;
@@ -548,7 +548,7 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
     total_preprocess += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
 
     time_start = chrono::high_resolution_clock::now();
-    Ciphertext result = evaluatePackedLWECiphertext(seal_context, lwe_ct_list, lwe_sk_sqrt_list, gal_keys, n, ring_dim, gateEval);
+    Ciphertext result = evaluatePackedLWECiphertext(seal_context, lwe_ct_list, lwe_sk_sqrt_list, gal_keys, n, q_shift_constant, ring_dim, gateEval);
     time_end = chrono::high_resolution_clock::now();
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for evaluation: " << total_online << endl;

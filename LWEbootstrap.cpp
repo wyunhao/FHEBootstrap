@@ -84,7 +84,7 @@ int main() {
     auto lwe_params = regevParam(n, p, 1.3, ring_dim); 
     auto lwe_sk = regevGenerateSecretKey(lwe_params);
     for (int i = 0; i < n; i++) {
-        lwe_sk[i] = new_key.data()[i] > p ? p-1 : new_key.data()[i];
+        lwe_sk[i] = (int) new_key.data()[i] > p ? p-1 : new_key.data()[i];
     }
 
     seal::util::RNSIter new_key_rns(new_key.data().data(), ring_dim);
@@ -100,8 +100,9 @@ int main() {
 
     /////////////////////////////////////////////////////// BOOTSTRAP //////////////////////////////////////////////////
 
+    vector<uint64_t> q_shift_constant(ring_dim, 0);
     vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
-                                                       ring_dim, n, p, ksk, rangeCheckIndices_bootstrap, my_pool, bfv_secret_key);
+                                                       ring_dim, n, p, ksk, rangeCheckIndices_bootstrap, my_pool, bfv_secret_key, q_shift_constant);
 
     ///////////////////////////////////////////// DECRYPT AND VERIFY STATS /////////////////////////////////////////////
     
