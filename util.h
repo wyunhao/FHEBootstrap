@@ -20,7 +20,7 @@ long modInverse(long a, long m)
 }
 
 inline void calUptoDegreeK(vector<Ciphertext>& output, const Ciphertext& input, const int DegreeK, const RelinKeys &relin_keys,
-                           const SEALContext& context) {
+                           const SEALContext& context, const bool skip_odd=false) {
     vector<int> calculated(DegreeK, 0);
     Evaluator evaluator(context);
     output[0] = input;
@@ -29,7 +29,10 @@ inline void calUptoDegreeK(vector<Ciphertext>& output, const Ciphertext& input, 
     vector<int> numMod(DegreeK, 0);
 
     for(int i = DegreeK; i > 0; i--){
-        if(calculated[i-1] == 0){
+        if (skip_odd && i % 2 == 1) { // 0 is for degree 1, 1 is for degree 2, skip all 2k+1 degree
+            calculated[i-1] = 1;
+            output[i-1] = input;
+        } else if(calculated[i-1] == 0){
             auto toCalculate = i;
             int resdeg = 0;
             int basedeg = 1;
@@ -67,9 +70,9 @@ inline void calUptoDegreeK(vector<Ciphertext>& output, const Ciphertext& input, 
                         evaluator.square_inplace(base);
                         evaluator.relinearize_inplace(base, relin_keys);
                         while(numMod[basedeg-1] < (ceil(log2(basedeg))/2)){
-                                evaluator.mod_switch_to_next_inplace(base);
-                                numMod[basedeg-1]+=1;
-                            }
+                            evaluator.mod_switch_to_next_inplace(base);
+                            numMod[basedeg-1]+=1;
+                        }
                         output[basedeg-1] = base;
                         calculated[basedeg-1] += 1;
                     }
@@ -320,7 +323,7 @@ void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphe
     Evaluator evaluator(context);
     BatchEncoder batch_encoder(context);
     vector<Ciphertext> kCTs(256);
-    calUptoDegreeK(kCTs, input, 256, relin_keys, context);
+    calUptoDegreeK(kCTs, input, 256, relin_keys, context, true);
 
     vector<Ciphertext> kToMCTs(256);
     calUptoDegreeK(kToMCTs, kCTs[kCTs.size()-1], 256, relin_keys, context);
