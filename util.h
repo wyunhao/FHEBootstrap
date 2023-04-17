@@ -502,8 +502,10 @@ vector<regevCiphertext> extractRLWECiphertextToLWECiphertext_NoModSwitch(Ciphert
 vector<regevCiphertext> preprocess_NAND(const vector<regevCiphertext>& ct_list_1, const vector<regevCiphertext>& ct_list_2,
                                         const regevParam& params) {
 
+    chrono::high_resolution_clock::time_point time_start, time_end;
+    time_start = chrono::high_resolution_clock::now();
+
     vector<regevCiphertext> result(ct_list_1.size());
-    
     for (int i = 0; i < (int) ct_list_1.size(); i++) {
         result[i].a = NativeVector(params.n);
         for (int j = 0; j < params.n; j++) {
@@ -511,6 +513,10 @@ vector<regevCiphertext> preprocess_NAND(const vector<regevCiphertext>& ct_list_1
         }
         result[i].b = (ct_list_1[i].b.ConvertToInt() + ct_list_2[i].b.ConvertToInt()) % params.q;
     }
+
+    time_end = chrono::high_resolution_clock::now();
+    cout << "TOTAL prepare NAND input time: " << chrono::duration_cast<chrono::microseconds>(time_end - time_start).count() << endl;
+    
     return result;
 }
 
