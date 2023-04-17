@@ -116,32 +116,40 @@ int main() {
     bool gateEval = true;
     int f_zero = p/3;
 
+    // NAND
+    // vector<uint64_t> q_shift_constant_NAND(ring_dim, -p/6);
+    // vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
+    //                                                    ring_dim, n, p, ksk, rangeCheckIndices_gateEvaluation, my_pool, bfv_secret_key, q_shift_constant_NAND, f_zero, gateEval);
+    // regevDec_Mod3(msg, lwe_ct_results, lwe_sk, lwe_params);
+    // cout << "Actual NAND result: \n" << msg << endl;
 
-    vector<uint64_t> q_shift_constant_NAND(ring_dim, -p/6);
+    // OR
+    // vector<uint64_t> q_shift_constant_OR(ring_dim, -p/6-p/3);
+    // lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
+    //                                                    ring_dim, n, p, ksk, rangeCheckIndices_gateEvaluation, my_pool, bfv_secret_key, q_shift_constant_OR, f_zero, gateEval);
+    // regevDec_Mod3(msg, lwe_ct_results, lwe_sk, lwe_params);
+    // cout << "Actual OR result: \n" << msg << endl;
+
+    // XNOR
+    // vector<uint64_t> q_shift_constant_XNOR(ring_dim, -p/6+p/3);
+    // lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
+    //                                                    ring_dim, n, p, ksk, rangeCheckIndices_gateEvaluation, my_pool, bfv_secret_key, q_shift_constant_XNOR, f_zero, gateEval);
+    // regevDec_Mod3(msg, lwe_ct_results, lwe_sk, lwe_params);
+    // cout << "Actual XNOR result: \n" << msg << endl;
+
+    // NAND, AND, OR, XOR, XNOR, NOR, each (ring_dim/6)
+    vector<uint64_t> q_shift_constant(ring_dim, 0);
+    for (int i = 0; i < ring_dim; i++) {
+        if (i < ring_dim/3) {
+            q_shift_constant[i] = -p/6;
+        } else if (i < 2 * ring_dim/3) {
+            q_shift_constant[i] = -p/6-p/3;
+        } else {
+            q_shift_constant[i] = -p/6+p/3;
+        }
+    }
     vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
-                                                       ring_dim, n, p, ksk, rangeCheckIndices_gateEvaluation, my_pool, bfv_secret_key, q_shift_constant_NAND, f_zero, gateEval);
-
-    regevDec_Mod3(msg, lwe_ct_results, lwe_sk, lwe_params);
-    cout << "Actual NAND result: \n" << msg << endl;
-
-
-
-
-
-    vector<uint64_t> q_shift_constant_OR(ring_dim, -p/6-p/3);
-    lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
-                                                       ring_dim, n, p, ksk, rangeCheckIndices_gateEvaluation, my_pool, bfv_secret_key, q_shift_constant_OR, f_zero, gateEval);
-
-    regevDec_Mod3(msg, lwe_ct_results, lwe_sk, lwe_params);
-    cout << "Actual OR result: \n" << msg << endl;
-
-
-
-
-    vector<uint64_t> q_shift_constant_XNOR(ring_dim, -p/6+p/3);
-    lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
-                                                       ring_dim, n, p, ksk, rangeCheckIndices_gateEvaluation, my_pool, bfv_secret_key, q_shift_constant_XNOR, f_zero, gateEval);
-
-    regevDec_Mod3(msg, lwe_ct_results, lwe_sk, lwe_params);
-    cout << "Actual XNOR result: \n" << msg << endl;
+                                                       ring_dim, n, p, ksk, rangeCheckIndices_gateEvaluation, my_pool, bfv_secret_key, q_shift_constant, f_zero, gateEval);
+    regevDec_Mod3_Mixed(msg, lwe_ct_results, lwe_sk, lwe_params);
+    cout << "Actual result: \n" << msg << endl;
 }

@@ -178,3 +178,31 @@ void regevDec_Mod3(vector<int>& msg, const vector<regevCiphertext>& ct, const re
         }
     }
 }
+
+bool shouldNegate(const int i, const int dim = 32768) {
+    return!((i < dim/6) || (i < 3*dim/6 && i >= 2*dim/6) || (i < 5*dim/6 && i >= 4*dim/6));
+}
+
+void regevDec_Mod3_Mixed(vector<int>& msg, const vector<regevCiphertext>& ct, const regevSK& sk, const regevParam& param){
+    msg.resize(ct.size());
+
+    int q = param.q;
+    int n = param.n;
+    NativeInteger inner(0);
+    for (int i = 0; i < (int) ct.size(); i++) {
+        int temp = 0;
+        for (int j = 0; j < n; j++) {
+        long mul_tmp = (ct[i].a[j].ConvertToInt() * sk[j].ConvertToInt()) % q;
+            mul_tmp = mul_tmp < 0 ? mul_tmp + q : mul_tmp;
+            temp = (temp + (int) mul_tmp) % q;
+        }
+        temp = (temp + ct[i].b.ConvertToInt()) % q;
+        if ((temp >= 0 && temp < q/6) || (temp < q && temp > q-q/6)) {
+            msg[i] = shouldNegate(i) ? 1 : 0 ;
+        } else if ((temp >= q/6 && temp < q/2)) {
+            msg[i] = shouldNegate(i) ? 0 : 1 ;
+        } else {
+            msg[i] = 2;
+        }
+    }
+}
