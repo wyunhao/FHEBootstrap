@@ -257,17 +257,6 @@ Ciphertext slotToCoeff_WOPrepreocess(const SEALContext& context, vector<Cipherte
     Evaluator evaluator(context);
     BatchEncoder batch_encoder(context);
     vector<vector<int>> U = generateMatrixU_transpose(degree);
-
-    // ofstream datafile;
-    // datafile.open ("../data/U_32768.txt");
-
-    // for(size_t i = 0; i < U.size(); i++){
-    //     for (size_t j = 0; j < U[0].size(); j++) {
-    //         datafile << U[i][j] << "\n";
-    //     }
-    // }
-    // datafile.close();
-
     int sq_rt = sqrt(degree/2);
 
     chrono::high_resolution_clock::time_point time_start, time_end;
@@ -281,14 +270,14 @@ Ciphertext slotToCoeff_WOPrepreocess(const SEALContext& context, vector<Cipherte
                 int row_index = (i-iter) % (degree/2) < 0 ? (i-iter) % (degree/2) + degree/2 : (i-iter) % (degree/2);
                 row_index = i < degree/2 ? row_index : row_index + degree/2;
                 int col_index = (i + j*sq_rt) % (degree/2);
-                if (j < ct_sqrt_list.size() / 2) { // first half
+                if (j < (int) ct_sqrt_list.size() / 2) { // first half
                     col_index = i < degree/2 ? col_index : col_index + degree/2;
                 } else {
                     col_index = i < degree/2 ? col_index + degree/2 : col_index;
                 }
                 U_tmp[i] = U[row_index][col_index];
             }
-            // writeUtemp(U_tmp, j*sq_rt + iter);
+            writeUtemp(U_tmp, j*sq_rt + iter);
 
             Plaintext U_plain;
             batch_encoder.encode(U_tmp, U_plain);
@@ -595,19 +584,20 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
         evaluator.transform_to_ntt_inplace(ct_sqrt_list[i+sq_ct]);
     }
 
-    vector<Plaintext> U_plain_list(ring_dim);
-    for (int iter = 0; iter < sq_ct; iter++) {
-        for (int j = 0; j < (int) ct_sqrt_list.size(); j++) {
-            vector<uint64_t> U_tmp = readUtemp(j*sq_ct + iter);
-            batch_encoder.encode(U_tmp, U_plain_list[iter * ct_sqrt_list.size() + j]);
-            evaluator.transform_to_ntt_inplace(U_plain_list[iter * ct_sqrt_list.size() + j], ct_sqrt_list[j].parms_id());
-        }
-    }
+    // vector<Plaintext> U_plain_list(ring_dim);
+    // for (int iter = 0; iter < sq_ct; iter++) {
+    //     for (int j = 0; j < (int) ct_sqrt_list.size(); j++) {
+    //         vector<uint64_t> U_tmp = readUtemp(j*sq_ct + iter);
+    //         batch_encoder.encode(U_tmp, U_plain_list[iter * ct_sqrt_list.size() + j]);
+    //         evaluator.transform_to_ntt_inplace(U_plain_list[iter * ct_sqrt_list.size() + j], ct_sqrt_list[j].parms_id());
+    //     }
+    // }
     time_end = chrono::high_resolution_clock::now();
     total_preprocess += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
 
     time_start = chrono::high_resolution_clock::now();
-    Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys, ring_dim);
+    // Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys, ring_dim);
+    Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, ct_sqrt_list, gal_keys, ring_dim);
     time_end = chrono::high_resolution_clock::now();
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for slotToCoeff: " << total_online << endl;
