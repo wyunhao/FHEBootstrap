@@ -143,14 +143,12 @@ int main() {
     // XNOR, XOR --> -p/6+p/3 = p/6
     vector<uint64_t> q_shift_constant(ring_dim, 0);
     for (int i = 0; i < ring_dim; i++) {
-        if (i < ring_dim/4) {
+        if (i < ring_dim/3) {
             q_shift_constant[i] = 5*p/6;
-        } else if (i < ring_dim/2) {
-            q_shift_constant[i] = p/6;
-        } else if (i < 3*ring_dim/4) {
-            q_shift_constant[i] = p/6;
-        } else {
+        } else if (i < 2*ring_dim/3) {
             q_shift_constant[i] = p/2;
+        } else {
+            q_shift_constant[i] = p/6;
         }
     }
     vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,

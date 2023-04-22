@@ -584,20 +584,20 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
         evaluator.transform_to_ntt_inplace(ct_sqrt_list[i+sq_ct]);
     }
 
-    // vector<Plaintext> U_plain_list(ring_dim);
-    // for (int iter = 0; iter < sq_ct; iter++) {
-    //     for (int j = 0; j < (int) ct_sqrt_list.size(); j++) {
-    //         vector<uint64_t> U_tmp = readUtemp(j*sq_ct + iter);
-    //         batch_encoder.encode(U_tmp, U_plain_list[iter * ct_sqrt_list.size() + j]);
-    //         evaluator.transform_to_ntt_inplace(U_plain_list[iter * ct_sqrt_list.size() + j], ct_sqrt_list[j].parms_id());
-    //     }
-    // }
+    vector<Plaintext> U_plain_list(ring_dim);
+    for (int iter = 0; iter < sq_ct; iter++) {
+        for (int j = 0; j < (int) ct_sqrt_list.size(); j++) {
+            vector<uint64_t> U_tmp = readUtemp(j*sq_ct + iter);
+            batch_encoder.encode(U_tmp, U_plain_list[iter * ct_sqrt_list.size() + j]);
+            evaluator.transform_to_ntt_inplace(U_plain_list[iter * ct_sqrt_list.size() + j], ct_sqrt_list[j].parms_id());
+        }
+    }
     time_end = chrono::high_resolution_clock::now();
     total_preprocess += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
 
     time_start = chrono::high_resolution_clock::now();
-    // Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys, ring_dim);
-    Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, ct_sqrt_list, gal_keys, ring_dim);
+    Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys, ring_dim);
+    // Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, ct_sqrt_list, gal_keys, ring_dim);
     time_end = chrono::high_resolution_clock::now();
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for slotToCoeff: " << total_online << endl;
