@@ -164,7 +164,7 @@ void regevDec_Mod3(vector<int>& msg, const vector<regevCiphertext>& ct, const re
     for (int i = 0; i < (int) ct.size(); i++) {
         int temp = 0;
         for (int j = 0; j < n; j++) {
-        long mul_tmp = (ct[i].a[j].ConvertToInt() * sk[j].ConvertToInt()) % q;
+            long mul_tmp = (ct[i].a[j].ConvertToInt() * sk[j].ConvertToInt()) % q;
             mul_tmp = mul_tmp < 0 ? mul_tmp + q : mul_tmp;
             temp = (temp + (int) mul_tmp) % q;
         }
@@ -192,7 +192,7 @@ void regevDec_Mod3_Mixed(vector<int>& msg, const vector<regevCiphertext>& ct, co
     for (int i = 0; i < (int) ct.size(); i++) {
         int temp = 0;
         for (int j = 0; j < n; j++) {
-        long mul_tmp = (ct[i].a[j].ConvertToInt() * sk[j].ConvertToInt()) % q;
+            long mul_tmp = (ct[i].a[j].ConvertToInt() * sk[j].ConvertToInt()) % q;
             mul_tmp = mul_tmp < 0 ? mul_tmp + q : mul_tmp;
             temp = (temp + (int) mul_tmp) % q;
         }

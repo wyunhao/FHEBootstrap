@@ -280,7 +280,12 @@ Ciphertext slotToCoeff_WOPrepreocess(const SEALContext& context, vector<Cipherte
             for (int i = 0; i < degree; i++) {
                 int row_index = (i-iter) % (degree/2) < 0 ? (i-iter) % (degree/2) + degree/2 : (i-iter) % (degree/2);
                 row_index = i < degree/2 ? row_index : row_index + degree/2;
-                int col_index = (i + j*sq_rt) % degree;
+                int col_index = (i + j*sq_rt) % (degree/2);
+                if (j < ct_sqrt_list.size() / 2) { // first half
+                    col_index = i < degree/2 ? col_index : col_index + degree/2;
+                } else {
+                    col_index = i < degree/2 ? col_index + degree/2 : col_index;
+                }
                 U_tmp[i] = U[row_index][col_index];
             }
             // writeUtemp(U_tmp, j*sq_rt + iter);

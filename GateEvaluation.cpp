@@ -137,19 +137,26 @@ int main() {
     // regevDec_Mod3(msg, lwe_ct_results, lwe_sk, lwe_params);
     // cout << "Actual XNOR result: \n" << msg << endl;
 
-    // NAND, AND, OR, XOR, XNOR, NOR, each (ring_dim/6)
+    // NAND, AND, OR, NOR, XNOR, XOR, each (ring_dim/6)
+    // NAND, AND --> -p/6 = 5*p/6
+    // OR, NOR   --> -p/6-p/3 = p/2
+    // XNOR, XOR --> -p/6+p/3 = p/6
     vector<uint64_t> q_shift_constant(ring_dim, 0);
     for (int i = 0; i < ring_dim; i++) {
-        if (i < ring_dim/3) {
-            q_shift_constant[i] = -p/6;
-        } else if (i < 2 * ring_dim/3) {
-            q_shift_constant[i] = -p/6-p/3;
+        if (i < ring_dim/4) {
+            q_shift_constant[i] = 5*p/6;
+        } else if (i < ring_dim/2) {
+            q_shift_constant[i] = p/6;
+        } else if (i < 3*ring_dim/4) {
+            q_shift_constant[i] = p/6;
         } else {
-            q_shift_constant[i] = -p/6+p/3;
+            q_shift_constant[i] = p/2;
         }
     }
     vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
                                                        ring_dim, n, p, ksk, rangeCheckIndices_gateEvaluation, my_pool, bfv_secret_key, q_shift_constant, f_zero, gateEval);
     regevDec_Mod3_Mixed(msg, lwe_ct_results, lwe_sk, lwe_params);
+
+
     cout << "Actual result: \n" << msg << endl;
 }
