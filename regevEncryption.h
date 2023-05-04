@@ -39,11 +39,14 @@ typedef vector<regevCiphertext> regevPK;
 regevSK regevGenerateSecretKey(const regevParam& param);
 regevPK regevGeneratePublicKey(const regevParam& param, const regevSK& sk);
 regevPK regevGeneratePublicKey_Mod3(const regevParam& param, const regevSK& sk);
+regevPK regevGenerateSquareRootInput(const regevParam& param, const regevSK& sk);
 void regevEncSK(regevCiphertext& ct, const int& msg, const regevSK& sk, const regevParam& param, const bool& pk_gen = false);
 void regevEncSK_Mod3(regevCiphertext& ct, const int& msg, const regevSK& sk, const regevParam& param, const int enc_num);
+void regevEncSK_Value(regevCiphertext& ct, const int msg, const regevSK& sk, const regevParam& param);
 void regevEncPK(regevCiphertext& ct, const int& msg, const regevPK& pk, const regevParam& param);
 void regevDec(int& msg, const regevCiphertext& ct, const regevSK& sk, const regevParam& param);
 void regevDec_Mod3(int& msg, const regevCiphertext& ct, const regevSK& sk, const regevParam& param);
+void regevDec_Value(int& msg, const regevCiphertext& ct, const regevSK& sk, const regevParam& param);
 
 /////////////////////////////////////////////////////////////////// Below are implementation
 
@@ -116,6 +119,34 @@ regevPK regevGeneratePublicKey_Mod3(const regevParam& param, const regevSK& sk, 
     return pk;
 }
 
+void regevEncSK_Value(regevCiphertext& ct, const int msg, const regevSK& sk, const regevParam& param){
+    NativeInteger q = param.q;
+    int n = param.n;
+    DiscreteUniformGeneratorImpl<NativeVector> dug;
+    dug.SetModulus(q);
+    ct.a = dug.GenerateVector(n);
+    NativeInteger mu = q.ComputeMu();
+    for (int i = 0; i < n; ++i) {
+        ct.b += ct.a[i].ModMulFast(sk[i], q, mu);
+    }
+    ct.b.ModEq(q);
+    if (msg) {
+        ct.b.ModAddFastEq(128 * msg, q);
+    }
+    DiscreteGaussianGeneratorImpl<NativeVector> m_dgg(param.std_dev);
+    ct.b.ModAddFastEq(m_dgg.GenerateInteger(q), q);
+}
+
+// map 2^9 to 2^16
+regevPK regevGenerateSquareRootInput(const regevParam& param, const regevSK& sk){
+    regevPK pk(param.m);
+    for(int i = 0; i < param.m; i++){
+        int val = i % 512; // the value to encrypt
+        regevEncSK_Value(pk[i], val, sk, param);
+    }
+    return pk;
+}
+
 
 void regevEncPK(regevCiphertext& ct, const int& msg, const regevPK& pk, const regevParam& param){
     prng_seed_type seed;
@@ -154,6 +185,29 @@ void regevDec(vector<int>& msg, const vector<regevCiphertext>& ct, const regevSK
         msg[j] = (r >= 0 && r < 65537/4) || (r < 65537 && r > 65537-65537/4) ? 0 : 1;
     }
 }
+
+// map 2^16 to 2^9
+void regevDec_Value(vector<int>& msg, const vector<regevCiphertext>& ct, const regevSK& sk, const regevParam& param){
+    msg.resize(ct.size());
+
+    int q = param.q;
+    int n = param.n;
+    NativeInteger inner(0);
+    for (int i = 0; i < (int) ct.size(); i++) {
+        int temp = 0;
+        for (int j = 0; j < n; j++) {
+            long mul_tmp = (ct[i].a[j].ConvertToInt() * sk[j].ConvertToInt()) % q;
+            mul_tmp = mul_tmp < 0 ? mul_tmp + q : mul_tmp;
+            temp = (temp + (int) mul_tmp) % q;
+        }
+        temp = (ct[i].b.ConvertToInt() - temp) % q;
+
+        temp = (temp + 64) % q; // 64 is error bound for 2^9
+        msg[i] = temp / 128;
+    }
+    cout << endl;
+}
+
 
 void regevDec_Mod3(vector<int>& msg, const vector<regevCiphertext>& ct, const regevSK& sk, const regevParam& param){
     msg.resize(ct.size());
