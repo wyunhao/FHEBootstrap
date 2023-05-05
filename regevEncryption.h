@@ -200,7 +200,7 @@ void regevDec_Value(vector<int>& msg, const vector<regevCiphertext>& ct, const r
             mul_tmp = mul_tmp < 0 ? mul_tmp + q : mul_tmp;
             temp = (temp + (int) mul_tmp) % q;
         }
-        temp = (ct[i].b.ConvertToInt() - temp) % q;
+        temp = (ct[i].b.ConvertToInt() + temp) % q;
 
         temp = (temp + 64) % q; // 64 is error bound for 2^9
         msg[i] = temp / 128;

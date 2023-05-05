@@ -310,14 +310,15 @@ Ciphertext slotToCoeff_WOPrepreocess(const SEALContext& context, vector<Cipherte
 
 void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphertext& input, const vector<uint64_t>& rangeCheckIndices,
                                              int modulus, const size_t& degree, const RelinKeys &relin_keys, const SEALContext& context,
-                                             const int f_zero = 0, const bool gateEval = false, const int p = 65537) {
+                                             const int f_zero = 0, const bool gateEval = false, const bool skip_first_odd = true,
+                                             const int p = 65537) {
     MemoryPoolHandle my_pool_larger = MemoryPoolHandle::New(true);
     auto old_prof_larger = MemoryManager::SwitchProfile(std::make_unique<MMProfFixed>(std::move(my_pool_larger)));
 
     Evaluator evaluator(context);
     BatchEncoder batch_encoder(context);
     vector<Ciphertext> kCTs(256);
-    calUptoDegreeK(kCTs, input, 256, relin_keys, context, true);
+    calUptoDegreeK(kCTs, input, 256, relin_keys, context, skip_first_odd);
 
     vector<Ciphertext> kToMCTs(256);
     calUptoDegreeK(kToMCTs, kCTs[kCTs.size()-1], 256, relin_keys, context);
@@ -519,7 +520,7 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
                                   const RelinKeys& relin_keys, const GaloisKeys& gal_keys, const int ring_dim, const int n,
                                   const int p, const KSwitchKeys& ksk, const vector<uint64_t>& rangeCheckIndices,
                                   const MemoryPoolHandle& my_pool, const SecretKey& bfv_secret_key, const vector<uint64_t>& q_shift_constant,
-                                  const int f_zero = 0, const bool gateEval = false) {
+                                  const int f_zero = 0, const bool gateEval = false, const bool skip_first_odd = true) {
     chrono::high_resolution_clock::time_point time_start, time_end;
     int total_preprocess = 0, total_online = 0;
 
@@ -556,7 +557,7 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
 
     Ciphertext range_check_res;
     time_start = chrono::high_resolution_clock::now();
-    Bootstrap_RangeCheck_PatersonStockmeyer(range_check_res, result, rangeCheckIndices, p, ring_dim, relin_keys, seal_context, 0, gateEval);
+    Bootstrap_RangeCheck_PatersonStockmeyer(range_check_res, result, rangeCheckIndices, p, ring_dim, relin_keys, seal_context, f_zero, gateEval, skip_first_odd);
     time_end = chrono::high_resolution_clock::now();
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for rangecheck: " << total_online << endl;

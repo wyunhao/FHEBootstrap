@@ -107,10 +107,11 @@ int main() {
     /////////////////////////////////////////////////// BOOTSTRAP //////////////////////////////////////////////////////
     vector<uint64_t> q_shift_constant(ring_dim, 0);
     vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
-                                                       ring_dim, n, p, ksk, rangeCheckIndices_squareRoot, my_pool, bfv_secret_key, q_shift_constant);
+                                                       ring_dim, n, p, ksk, rangeCheckIndices_squareRoot, my_pool, bfv_secret_key,
+                                                       q_shift_constant, 0, false, false);
+
 
     regevDec_Value(msg, lwe_ct_results, lwe_sk, lwe_params);
-
 
     cout << "Actual result: \n" << msg << endl;
 }
