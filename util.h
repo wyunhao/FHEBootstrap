@@ -29,6 +29,10 @@ inline void calUptoDegreeK(vector<Ciphertext>& output, const Ciphertext& input, 
     vector<int> numMod(DegreeK, 0);
 
     for(int i = DegreeK; i > 0; i--){
+        // if (i == 512 && skip) {
+        //     cout << "Calculated: " << calculated << endl;
+        //     break;
+        // }
         if (skip_odd && i % 2 == 1) { // 0 is for degree 1, 1 is for degree 2, skip all 2k+1 degree
             calculated[i-1] = 1;
             output[i-1] = input;
@@ -81,9 +85,11 @@ inline void calUptoDegreeK(vector<Ciphertext>& output, const Ciphertext& input, 
         }
     }
 
+    // if (!skip) {
     for(size_t i = 0; i < output.size()-1; i++){
         evaluator.mod_switch_to_inplace(output[i], output[output.size()-1].parms_id()); // match modulus
     }
+    // }
     return;
 }
 
@@ -154,16 +160,16 @@ Ciphertext evaluatePackedLWECiphertext(const SEALContext& seal_context, vector<r
     return result[0];
 }
 
-vector<vector<int>> generateMatrixU_transpose(int n) {
+vector<vector<int>> generateMatrixU_transpose(int n, const int q = 65537) {
     vector<vector<int>> U(n,  vector<int>(n));
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             if (i == 0) {
-                U[i][j] = (int) power(primitive_root, j, 65537);
+                U[i][j] = (int) power(primitive_root, j, q);
             } else if (i == n/2) {
-                U[i][j] = (int) modInverse(U[0][j], 65537);
+                U[i][j] = (int) modInverse(U[0][j], q);
             } else {
-                U[i][j] = (int) power(U[i-1][j], 3, 65537);
+                U[i][j] = (int) power(U[i-1][j], 3, q);
             }
         }
     }
@@ -309,33 +315,76 @@ Ciphertext slotToCoeff_WOPrepreocess(const SEALContext& context, vector<Cipherte
 
 
 void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphertext& input, const vector<uint64_t>& rangeCheckIndices,
-                                             int modulus, const size_t& degree, const RelinKeys &relin_keys, const SEALContext& context,
+                                             const int modulus, const size_t& degree, const RelinKeys &relin_keys, const SEALContext& context, const SecretKey& bfv_secret_key, 
                                              const int f_zero = 0, const bool gateEval = false, const bool skip_first_odd = true,
-                                             const int p = 65537) {
+                                             const int firstDegree = 256, const int secondDegree = 256) {
     MemoryPoolHandle my_pool_larger = MemoryPoolHandle::New(true);
     auto old_prof_larger = MemoryManager::SwitchProfile(std::make_unique<MMProfFixed>(std::move(my_pool_larger)));
 
+    Decryptor decryptor(context, bfv_secret_key);
     Evaluator evaluator(context);
     BatchEncoder batch_encoder(context);
-    vector<Ciphertext> kCTs(256);
-    calUptoDegreeK(kCTs, input, 256, relin_keys, context, skip_first_odd);
+    vector<Ciphertext> kCTs(firstDegree);
+    // chrono::high_resolution_clock::time_point time_start, time_end;
+    // time_start = chrono::high_resolution_clock::now();
+    calUptoDegreeK(kCTs, input, firstDegree, relin_keys, context, skip_first_odd);
+    // time_end = chrono::high_resolution_clock::now();
+    // cout << "first level: " << chrono::duration_cast<chrono::microseconds>(time_end - time_start).count() << endl;
 
-    vector<Ciphertext> kToMCTs(256);
-    calUptoDegreeK(kToMCTs, kCTs[kCTs.size()-1], 256, relin_keys, context);
+    // cout << "KCT :\n";
+    Plaintext pl;
+    vector<uint64_t> v(degree);
+    // for (int i = 0; i < kCTs.size(); i++) {
+    //     decryptor.decrypt(kCTs[i], pl);
+    //     batch_encoder.decode(pl, v);
+    //     cout << v[1] << ",";
+    // }
+    // cout << endl;
 
-    for (int i = 0; i < 3; i++) {
+    vector<Ciphertext> kToMCTs(secondDegree);
+    // time_start = chrono::high_resolution_clock::now();
+    calUptoDegreeK(kToMCTs, kCTs[kCTs.size()-1], secondDegree, relin_keys, context);
+    // time_end = chrono::high_resolution_clock::now();
+    // cout << "second level: " << chrono::duration_cast<chrono::microseconds>(time_end - time_start).count() << endl;
+
+    // cout << "KToMCT :\n";
+    // for (int i = 0; i < kToMCTs.size(); ) {
+    //     decryptor.decrypt(kToMCTs[i], pl);
+    //     batch_encoder.decode(pl, v);
+    //     cout << v[1] << ",";
+    //     i = (i+1)*2 - 1;
+    // }
+    decryptor.decrypt(kToMCTs[kToMCTs.size()-1], pl);
+    batch_encoder.decode(pl, v);
+    cout << v[1];
+
+    cout << "Noise of last: " << decryptor.invariant_noise_budget(kToMCTs[kToMCTs.size()-1]) << " bits\n";
+
+    cout << endl;
+
+
+    decryptor.decrypt(kToMCTs[kToMCTs.size()-1], pl);
+    batch_encoder.decode(pl, v);
+    cout << "Decrypt SHOULD BE ALL 1: \n" << v << endl;
+
+
+    for (int i = 0; i < 4; i++) {
         for (int j = 0; j < (int) kCTs.size(); j++) {
             evaluator.mod_switch_to_next_inplace(kCTs[j]);
         }
     }
 
     Ciphertext temp_relin(context);
-    for(int i = 0; i < 256; i++) {
+    // int third = 0;
+    
+    for(int i = 0; i < secondDegree; i++) {
         Ciphertext levelSum;
         bool flag = false;
-        for(int j = 0; j < 256; j++) {
-            if(rangeCheckIndices[i*256+j] != 0) {
-                vector<uint64_t> intInd(degree, rangeCheckIndices[i*256+j]);
+        for(int j = 0; j < firstDegree; j++) {
+            if(rangeCheckIndices[i*firstDegree+j] != 0) {
+                vector<uint64_t> intInd(degree, rangeCheckIndices[i*firstDegree+j]);
+            // if (true) {
+            //     vector<uint64_t> intInd(degree, 1);
                 Plaintext plainInd;
                 batch_encoder.encode(intInd, plainInd);
                 if (!flag) {
@@ -349,6 +398,7 @@ void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphe
             }
         }
         evaluator.mod_switch_to_inplace(levelSum, kToMCTs[i].parms_id()); // mod down the plaintext multiplication noise
+        // time_start = chrono::high_resolution_clock::now();
         if(i == 0) {
             ciphertext = levelSum;
         } else if (i == 1) { // initialize for temp_relin, which is of ct size = 3
@@ -357,9 +407,16 @@ void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphe
             evaluator.multiply_inplace(levelSum, kToMCTs[i - 1]);
             evaluator.add_inplace(temp_relin, levelSum);
         }
+        // time_end = chrono::high_resolution_clock::now();
+        // third += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     }
-    for(int i = 0; i < 256; i++){
+
+    // cout << "third level: " << third << endl;
+    
+    for(int i = 0; i < firstDegree; i++){
         kCTs[i].release();
+    }
+    for(int i = 0; i < secondDegree; i++){
         kToMCTs[i].release();
     }
 
@@ -373,8 +430,13 @@ void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphe
     evaluator.negate_inplace(ciphertext);
     evaluator.add_plain_inplace(ciphertext, plainInd);
 
+    decryptor.decrypt(ciphertext, pl);
+    batch_encoder.decode(pl, v);
+    cout << "Decrypt of function should be all ZERO: \n" << v << endl;
+    cout << "Noise after function: " << decryptor.invariant_noise_budget(ciphertext) << " bits\n";
+
     if (gateEval) { // flip 0 to q/3, q/3 to 0
-        vector<uint64_t> flip_constant(degree, p/3); 
+        vector<uint64_t> flip_constant(degree, modulus/3); 
         Plaintext flip_pl;
         batch_encoder.encode(flip_constant, flip_pl);
         evaluator.negate_inplace(ciphertext);
@@ -520,7 +582,8 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
                                   const RelinKeys& relin_keys, const GaloisKeys& gal_keys, const int ring_dim, const int n,
                                   const int p, const KSwitchKeys& ksk, const vector<uint64_t>& rangeCheckIndices,
                                   const MemoryPoolHandle& my_pool, const SecretKey& bfv_secret_key, const vector<uint64_t>& q_shift_constant,
-                                  const int f_zero = 0, const bool gateEval = false, const bool skip_first_odd = true) {
+                                  const int f_zero = 0, const bool gateEval = false, const bool skip_first_odd = true,
+                                  const int firstDegree = 256, const int secondDegree = 256) {
     chrono::high_resolution_clock::time_point time_start, time_end;
     int total_preprocess = 0, total_online = 0;
 
@@ -549,22 +612,24 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
     cout << "TOTAL TIME for evaluation: " << total_online << endl;
     // cout << "Noise: " << decryptor.invariant_noise_budget(result) << " bits\n";
 
-    // Plaintext pl;
-    // vector<uint64_t> v(ring_dim);
-    // decryptor.decrypt(result, pl);
-    // batch_encoder.decode(pl, v);
-    // cout << "Decrypt after evaluation: \n" << v << endl;
+    Plaintext pl;
+    vector<uint64_t> v(ring_dim);
+    decryptor.decrypt(result, pl);
+    batch_encoder.decode(pl, v);
+    cout << "Decrypt after evaluation: \n" << v << endl;
 
     Ciphertext range_check_res;
     time_start = chrono::high_resolution_clock::now();
-    Bootstrap_RangeCheck_PatersonStockmeyer(range_check_res, result, rangeCheckIndices, p, ring_dim, relin_keys, seal_context, f_zero, gateEval, skip_first_odd);
+    Bootstrap_RangeCheck_PatersonStockmeyer(range_check_res, result, rangeCheckIndices, p, ring_dim,
+                                            relin_keys, seal_context, bfv_secret_key, f_zero, gateEval, skip_first_odd,
+                                            firstDegree, secondDegree);
     time_end = chrono::high_resolution_clock::now();
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for rangecheck: " << total_online << endl;
 
-    // decryptor.decrypt(range_check_res, pl);
-    // batch_encoder.decode(pl, v);
-    // cout << "Decrypt after rangeCheck: \n" << v << endl;
+    decryptor.decrypt(range_check_res, pl);
+    batch_encoder.decode(pl, v);
+    cout << "Decrypt after rangeCheck: \n" << v << endl;
 
     ////////////////////////////////////////// SLOT TO COEFFICIENT /////////////////////////////////////////////////////
 

@@ -119,7 +119,7 @@ regevPK regevGeneratePublicKey_Mod3(const regevParam& param, const regevSK& sk, 
     return pk;
 }
 
-void regevEncSK_Value(regevCiphertext& ct, const int msg, const regevSK& sk, const regevParam& param){
+void regevEncSK_Value(regevCiphertext& ct, const int msg, const regevSK& sk, const regevParam& param, const int errorRange = 128){
     NativeInteger q = param.q;
     int n = param.n;
     DiscreteUniformGeneratorImpl<NativeVector> dug;
@@ -131,18 +131,18 @@ void regevEncSK_Value(regevCiphertext& ct, const int msg, const regevSK& sk, con
     }
     ct.b.ModEq(q);
     if (msg) {
-        ct.b.ModAddFastEq(128 * msg, q);
+        ct.b.ModAddFastEq(errorRange * msg, q);
     }
     DiscreteGaussianGeneratorImpl<NativeVector> m_dgg(param.std_dev);
     ct.b.ModAddFastEq(m_dgg.GenerateInteger(q), q);
 }
 
 // map 2^9 to 2^16
-regevPK regevGenerateSquareRootInput(const regevParam& param, const regevSK& sk){
+regevPK regevGenerateSquareRootInput(const regevParam& param, const regevSK& sk, const int plaintextSpace = 512, const int errorRange = 128){
     regevPK pk(param.m);
     for(int i = 0; i < param.m; i++){
-        int val = i % 512; // the value to encrypt
-        regevEncSK_Value(pk[i], val, sk, param);
+        int val = i % plaintextSpace; // the value to encrypt
+        regevEncSK_Value(pk[i], val, sk, param, errorRange);
     }
     return pk;
 }

@@ -16,12 +16,14 @@ int main() {
     ////////////////////////////////////////////// PREPARE (R)LWE PARAMS ///////////////////////////////////////////////
     int ring_dim = poly_modulus_degree_glb;
     int n = 1024;
-    int p = 65537;
+    int p = prime_p;
+    // int p = 65537;
 
     EncryptionParameters bfv_params(scheme_type::bfv);
     bfv_params.set_poly_modulus_degree(ring_dim);
-    auto coeff_modulus = CoeffModulus::Create(ring_dim, { 28, 60, 55, 60, 60,
-                                                          60, 60, 60, 60, 60,
+
+    auto coeff_modulus = CoeffModulus::Create(ring_dim, { 28, 60, 55, 60, 60, 60, 60,
+                                                          60, 60, 60, 60, 60, 60, 60,
                                                           50, 60 });
     bfv_params.set_coeff_modulus(coeff_modulus);
     bfv_params.set_plain_modulus(p);
@@ -38,7 +40,7 @@ int main() {
 
     KeyGenerator new_key_keygen(seal_context, n);
     SecretKey new_key = new_key_keygen.secret_key();
-    inverse_ntt_negacyclic_harvey(new_key.data().data(), seal_context.key_context_data()->small_ntt_tables()[0]);
+    inverse_ntt_negacyclic_harvey(new_key.data().data(), seal_context.key_context_data()->small_ntt_tables()[0]);  
 
     KeyGenerator keygen(seal_context);
     SecretKey bfv_secret_key = keygen.secret_key();
@@ -93,7 +95,8 @@ int main() {
 
     vector<int> msg(ring_dim);
 
-    vector<regevCiphertext> lwe_ct_list = regevGenerateSquareRootInput(lwe_params, lwe_sk); // enc 0
+    // , 512, 128);//
+    vector<regevCiphertext> lwe_ct_list = regevGenerateSquareRootInput(lwe_params, lwe_sk, 4096, 192); // enc 0
 
     // regevDec_Value(msg, lwe_ct_list, lwe_sk, lwe_params);
     // cout << "Input Ciphertex: \n" << msg << endl;
@@ -106,9 +109,22 @@ int main() {
 
     /////////////////////////////////////////////////// BOOTSTRAP //////////////////////////////////////////////////////
     vector<uint64_t> q_shift_constant(ring_dim, 0);
+    // vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
+    //                                                    ring_dim, n, p, ksk, rangeCheckIndices_squareRoot, my_pool, bfv_secret_key,
+    //                                                    q_shift_constant, 0, false, false);
+
+
+/**
+ * @brief vector<regevCiphertext>& lwe_ct_list, Ciphertext& lwe_sk_encrypted, const SEALContext& seal_context,
+                                  const RelinKeys& relin_keys, const GaloisKeys& gal_keys, const int ring_dim, const int n,
+                                  const int p, const KSwitchKeys& ksk, const vector<uint64_t>& rangeCheckIndices,
+                                  const MemoryPoolHandle& my_pool, const SecretKey& bfv_secret_key, const vector<uint64_t>& q_shift_constant,
+                                  const int f_zero = 0, const bool gateEval = false, const bool skip_first_odd = true, const int baseDegree = 256) {
+ * 
+ */
     vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
-                                                       ring_dim, n, p, ksk, rangeCheckIndices_squareRoot, my_pool, bfv_secret_key,
-                                                       q_shift_constant, 0, false, false);
+                                                       ring_dim, n, p, ksk, rangeCheckIndices_squareRoot_20, my_pool, bfv_secret_key,
+                                                       q_shift_constant, 0, false, false, 256*3, 1024);
 
 
     regevDec_Value(msg, lwe_ct_results, lwe_sk, lwe_params);
