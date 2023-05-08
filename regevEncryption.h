@@ -46,7 +46,7 @@ void regevEncSK_Value(regevCiphertext& ct, const int msg, const regevSK& sk, con
 void regevEncPK(regevCiphertext& ct, const int& msg, const regevPK& pk, const regevParam& param);
 void regevDec(int& msg, const regevCiphertext& ct, const regevSK& sk, const regevParam& param);
 void regevDec_Mod3(int& msg, const regevCiphertext& ct, const regevSK& sk, const regevParam& param);
-void regevDec_Value(int& msg, const regevCiphertext& ct, const regevSK& sk, const regevParam& param);
+void regevDec_Value(int& msg, const regevCiphertext& ct, const regevSK& sk, const regevParam& param, const int errorRange);
 
 /////////////////////////////////////////////////////////////////// Below are implementation
 
@@ -187,7 +187,7 @@ void regevDec(vector<int>& msg, const vector<regevCiphertext>& ct, const regevSK
 }
 
 // map 2^16 to 2^9
-void regevDec_Value(vector<int>& msg, const vector<regevCiphertext>& ct, const regevSK& sk, const regevParam& param){
+void regevDec_Value(vector<int>& msg, const vector<regevCiphertext>& ct, const regevSK& sk, const regevParam& param, const int errorRange){
     msg.resize(ct.size());
 
     int q = param.q;
@@ -202,8 +202,8 @@ void regevDec_Value(vector<int>& msg, const vector<regevCiphertext>& ct, const r
         }
         temp = (ct[i].b.ConvertToInt() + temp) % q;
 
-        temp = (temp + 64) % q; // 64 is error bound for 2^9
-        msg[i] = temp / 128;
+        temp = (temp + errorRange/2) % q; // 64 is error bound for 2^9
+        msg[i] = temp / errorRange;
     }
     cout << endl;
 }

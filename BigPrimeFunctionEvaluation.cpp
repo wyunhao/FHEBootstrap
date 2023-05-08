@@ -9,9 +9,6 @@
 using namespace seal;
 using namespace std;
 
-
-
-
 // for square root
 int main() {
 
@@ -19,15 +16,15 @@ int main() {
     ////////////////////////////////////////////// PREPARE (R)LWE PARAMS ///////////////////////////////////////////////
     int ring_dim = poly_modulus_degree_glb;
     int n = 1024;
-    BootstrapParam bootstrap_param = BootstrapParam(65537, 128, 512, 256, 256);
+    BootstrapParam bootstrap_param = BootstrapParam(786433, 192, 4096, 256*3, 1023);
     int p = bootstrap_param.ciphertextSpacePrime;
 
     EncryptionParameters bfv_params(scheme_type::bfv);
     bfv_params.set_poly_modulus_degree(ring_dim);
 
-    auto coeff_modulus = CoeffModulus::Create(ring_dim, { 28, 60, 55, 60, 60,
+    auto coeff_modulus = CoeffModulus::Create(ring_dim, { 28, 60, 60, 60, 60,
                                                           60, 60, 60, 60, 60,
-                                                          50, 60 });
+                                                          60, 60, 60, 30, 60 });
     bfv_params.set_coeff_modulus(coeff_modulus);
     bfv_params.set_plain_modulus(p);
 
@@ -98,6 +95,7 @@ int main() {
 
     vector<int> msg(ring_dim);
 
+    // , 512, 128);//
     vector<regevCiphertext> lwe_ct_list = regevGenerateSquareRootInput(lwe_params, lwe_sk, bootstrap_param.plaintextSpace, bootstrap_param.errorRange); // enc 0
 
     // regevDec_Value(msg, lwe_ct_list, lwe_sk, lwe_params);
@@ -124,7 +122,7 @@ int main() {
                                   const int f_zero = 0, const bool gateEval = false, const bool skip_first_odd = true, const int baseDegree = 256) {
  * 
  */
-    vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
+    vector<regevCiphertext> lwe_ct_results = bootstrap_bigPrime(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
                                                        ring_dim, n, p, ksk, rangeCheckIndices_squareRoot_20, my_pool, bfv_secret_key,
                                                        q_shift_constant, 0, false, false, bootstrap_param.firstLevelDegree, bootstrap_param.secondLevelDegree);
 
