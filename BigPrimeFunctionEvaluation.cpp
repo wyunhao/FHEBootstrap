@@ -6,8 +6,9 @@
 #include <numeric>
 #include <stdio.h>
 
-using namespace seal;
 using namespace std;
+using namespace seal;
+
 
 // for square root
 int main() {
@@ -22,7 +23,7 @@ int main() {
     EncryptionParameters bfv_params(scheme_type::bfv);
     bfv_params.set_poly_modulus_degree(ring_dim);
 
-    auto coeff_modulus = CoeffModulus::Create(ring_dim, { 28, 60, 60, 60, 60,
+    auto coeff_modulus = CoeffModulus::Create(ring_dim, { 28, 60, 60, 60, 60, 60,
                                                           60, 60, 60, 60, 60,
                                                           60, 60, 60, 30, 60 });
     bfv_params.set_coeff_modulus(coeff_modulus);
