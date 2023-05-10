@@ -17,7 +17,7 @@ int main() {
     ////////////////////////////////////////////// PREPARE (R)LWE PARAMS ///////////////////////////////////////////////
     int ring_dim = poly_modulus_degree_glb;
     int n = 1024;
-    BootstrapParam bootstrap_param = BootstrapParam(786433, 192, 4096, 256*3, 1023);
+    BootstrapParam bootstrap_param = BootstrapParam(786433, 192, 4096, 256*3, 1024);
     int p = bootstrap_param.ciphertextSpacePrime;
 
     EncryptionParameters bfv_params(scheme_type::bfv);
