@@ -413,7 +413,7 @@ void Bootstrap_RangeCheck_PatersonStockmeyer_bigPrime(Ciphertext& ciphertext, co
     BatchEncoder batch_encoder(context);
     vector<Ciphertext> kCTs(firstDegree);
 
-    map<int, bool> modDownIndices_firstLevel = {{4, false}, {16, false}, {64, false}, {256, false}};
+    map<int, bool> modDownIndices_firstLevel = {{2, false}, {8, false}, {32, false}, {128, false}, {512, false}};
     map<int, bool> modDownIndices_secondLevel = {{2, false}, {8, false}, {32, false}, {64, false}, {128, false}, {512, false}};
 
     calUptoDegreeK_bigPrime(kCTs, input, firstDegree, relin_keys, context, modDownIndices_firstLevel, skip_first_odd);
@@ -421,9 +421,9 @@ void Bootstrap_RangeCheck_PatersonStockmeyer_bigPrime(Ciphertext& ciphertext, co
     vector<Ciphertext> kToMCTs(secondDegree);
     calUptoDegreeK_bigPrime(kToMCTs, kCTs[kCTs.size()-1], secondDegree, relin_keys, context, modDownIndices_secondLevel);
 
-    for (int j = 0; j < (int) kToMCTs.size(); j++) {
-        evaluator.mod_switch_to_next_inplace(kToMCTs[j]);
-    }
+    // for (int j = 0; j < (int) kToMCTs.size(); j++) {
+    //     evaluator.mod_switch_to_next_inplace(kToMCTs[j]);
+    // }
     for (int j = 0; j < (int) kCTs.size(); j++) {
         evaluator.mod_switch_to_inplace(kCTs[j], kToMCTs[kToMCTs.size()-1].parms_id());
     }
@@ -709,8 +709,8 @@ vector<regevCiphertext> preprocess_NAND(const vector<regevCiphertext>& ct_list_1
 
 void modDownToPrime(Ciphertext& coeff, const int ring_dim, const uint64_t big_prime, const uint64_t small_prime=268369921) {
     for (int i = 0; i < ring_dim; i++) {
-        coeff.data(1)[i] =  (coeff.data(1)[i]) * small_prime / big_prime;
-        coeff.data(0)[i] =  (coeff.data(0)[i]) * small_prime / big_prime;
+        coeff.data(1)[i] =  uint64_t(float(coeff.data(1)[i]) * float(small_prime) / float(big_prime));
+        coeff.data(0)[i] =  uint64_t(float(coeff.data(0)[i]) * float(small_prime) / float(big_prime));
     }
 }
 
@@ -750,8 +750,8 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
     cout << "TOTAL TIME for evaluation: " << total_online << endl;
     cout << "Noise: " << decryptor.invariant_noise_budget(result) << " bits\n";
 
-    evaluator.mod_switch_to_next_inplace(result);
-    cout << "Noise after mod down: " << decryptor.invariant_noise_budget(result) << " bits\n";
+    // evaluator.mod_switch_to_next_inplace(result);
+    // cout << "Noise after mod down: " << decryptor.invariant_noise_budget(result) << " bits\n";
 
     Plaintext pl;
     vector<uint64_t> v(ring_dim);

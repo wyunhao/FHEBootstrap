@@ -14,15 +14,13 @@ int main() {
 
 
     ////////////////////////////////////////////// PREPARE (R)LWE PARAMS ///////////////////////////////////////////////
-    int ring_dim = 8;
-    int n = 4;
+    int ring_dim = 32768;
+    int n = 1024;
     int p = prime_p;
 
     EncryptionParameters bfv_params(scheme_type::bfv);
     bfv_params.set_poly_modulus_degree(ring_dim);
-    auto coeff_modulus = CoeffModulus::Create(ring_dim, { 28, 60, 60, 60, 60, 60,
-                                                          60, 60, 60, 60, 60, 60,
-                                                          60, 60, 60, 60, 60});
+    auto coeff_modulus = CoeffModulus::Create(ring_dim, { 60, 60, 28, 60});
     bfv_params.set_coeff_modulus(coeff_modulus);
     bfv_params.set_plain_modulus(p);
 
@@ -36,10 +34,21 @@ int main() {
     SEALContext seal_context(bfv_params, true, sec_level_type::none);
     cout << "primitive root: " << seal_context.first_context_data()->plain_ntt_tables()->get_root() << endl;
 
+    KeyGenerator new_key_keygen(seal_context, n);
+    SecretKey new_key = new_key_keygen.secret_key();
+    // inverse_ntt_negacyclic_harvey(new_key.data().data(), seal_context.key_context_data()->small_ntt_tables()[0]);  
+
     KeyGenerator keygen(seal_context);
     SecretKey bfv_secret_key = keygen.secret_key();
 
     MemoryPoolHandle my_pool = MemoryPoolHandle::New();
+
+    // generate a key switching key based on key_before and secret_key
+    KSwitchKeys ksk;
+    seal::util::ConstPolyIter secret_key_before(bfv_secret_key.data().data(), ring_dim, coeff_modulus.size());
+
+    new_key_keygen.generate_kswitch_keys(secret_key_before, 1, static_cast<KSwitchKeys &>(ksk), false);
+    ksk.parms_id() = seal_context.key_parms_id();
 
     PublicKey bfv_public_key;
     keygen.create_public_key(bfv_public_key);
@@ -67,41 +76,110 @@ int main() {
     keygen.create_galois_keys(rot_steps, gal_keys);
 
     // vector<uint64_t> msg = {21845, 21845, 32768, 32768, 0, 0, 43691, 43691};
-    vector<uint64_t> msg = {0, 21845, 32768, 43490, 10922, 30000, 50000, 20000};
-
-
-
+    vector<uint64_t> msg(ring_dim);
+    for (int i = 0; i< 10; i++) {
+        msg[i] = (i % 4096) * 192;
+    } //= {0, 21845, 32768, 43490, 10922, 30000, 50000, 20000};
     Plaintext pl;
     Ciphertext c;
     batch_encoder.encode(msg, pl);
     encryptor.encrypt(pl, c);
 
-    vector<Ciphertext> output(1023);
-    // map<int, bool> modDownIndices = {{4, false}, {16, false}, {64, false}, {256, false}};
 
-    map<int, bool> modDownIndices = {{2, false}, {8, false}, {32, false}, {64, false}, {128, false}, {512, false}};
-    // chrono::high_resolution_clock::time_point time_start, time_end;
-    // time_start = chrono::high_resolution_clock::now();
-    calUptoDegreeK_bigPrime(output, c, 1023, relin_keys, seal_context, modDownIndices);
+    Plaintext pl_1;
+    batch_encoder.encode(msg, pl_1);
 
 
-    cout << "Decryted check: \n";
-    vector<uint64_t> v(ring_dim);
-    for (int i = 0; i < output.size(); i++) {
-        decryptor.decrypt(output[i], pl);
-        batch_encoder.decode(pl, v);
-        cout << v[1] << ",";
+    chrono::high_resolution_clock::time_point time_start, time_end;
+
+    time_start = chrono::high_resolution_clock::now();
+    for (int i = 0; i< 10; i++) {
+        evaluator.multiply_plain_inplace(c, pl_1);
     }
-    cout << endl;
+    time_end = chrono::high_resolution_clock::now();
+    cout << "Pl Multi: " << chrono::duration_cast<chrono::microseconds>(time_end - time_start).count() << endl;
+
+    Ciphertext c1;
+    encryptor.encrypt(pl_1, c1);
+    time_start = chrono::high_resolution_clock::now();
+    for (int i = 0; i< 10; i++) {
+        evaluator.multiply_inplace(c, c1);
+    }
+    time_end = chrono::high_resolution_clock::now();
+    cout << "Ct Multi: " << chrono::duration_cast<chrono::microseconds>(time_end - time_start).count() << endl;
 
 
 
 
+    // TEST KEY SWITCH.....
+
+    // decryptor.decrypt(c, pl);
+    // batch_encoder.decode(pl, msg);
+    // cout << "Original Decrypt: " << msg << endl;
+
+
+    // for (int i = 0; i < ring_dim; i++) {
+    //     cout << new_key.data()[i] << " --> ";
+    //     new_key.data()[i] = (uint64_t) ((float(new_key.data()[i])) * float(268369921) / float(1152921504581419009));
+    //     cout << new_key.data()[i] << "  ";
+    // }
+    // cout << endl;
+
+    // while(seal_context.last_parms_id() != c.parms_id()){
+    //     evaluator.mod_switch_to_next_inplace(c);
+    // }
+
+
+    // modDownToPrime(c, ring_dim, 1152921504581419009, 268369921);
+    // for (int i = 0; i < ring_dim; i++) {
+    //     cout << c.data(0)[i] << "  ";
+    // }
+    // cout << endl;
+
+    // Ciphertext copy_coeff = c;
+    // auto ct_in_iter = util::iter(copy_coeff);
+    // ct_in_iter += c.size() - 1;
+    // seal::util::set_zero_poly(ring_dim, 1, c.data(1)); // notice that the coeff_mod.size() is hardcoded to 1, thus this needs to be performed on the last level
+
+    // evaluator.switch_key_inplace(c, *ct_in_iter, static_cast<const KSwitchKeys &>(ksk), 0, my_pool);
+
+
+    // for (int i = 0; i < ring_dim; i++) {
+    //     cout << c.data(0)[i] << "  ";
+    // }
+    // cout << endl;
+    
+    // Decryptor decryptor_new(seal_context, new_key);
+
+
+    // decryptor_new.decrypt(c, pl);
+    // batch_encoder.decode(pl, msg);
+    // cout << "New Decrypt: " << msg << endl;
 
 
 
 
+    // TEST MODDOWN FUNC.....
 
+
+
+    // vector<Ciphertext> output(1023);
+    // // map<int, bool> modDownIndices = {{4, false}, {16, false}, {64, false}, {256, false}};
+
+    // map<int, bool> modDownIndices = {{2, false}, {8, false}, {32, false}, {64, false}, {128, false}, {512, false}};
+    // // chrono::high_resolution_clock::time_point time_start, time_end;
+    // // time_start = chrono::high_resolution_clock::now();
+    // calUptoDegreeK_bigPrime(output, c, 1023, relin_keys, seal_context, modDownIndices);
+
+
+    // cout << "Decryted check: \n";
+    // vector<uint64_t> v(ring_dim);
+    // for (int i = 0; i < output.size(); i++) {
+    //     decryptor.decrypt(output[i], pl);
+    //     batch_encoder.decode(pl, v);
+    //     cout << v[1] << ",";
+    // }
+    // cout << endl;
 
 
 
