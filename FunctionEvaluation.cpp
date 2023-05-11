@@ -97,11 +97,8 @@ int main() {
     ntt_negacyclic_harvey(new_key_rns, coeff_modulus.size(), seal_context.key_context_data()->small_ntt_tables());
 
     vector<int> msg(ring_dim);
-
     vector<regevCiphertext> lwe_ct_list = regevGenerateSquareRootInput(lwe_params, lwe_sk, bootstrap_param.plaintextSpace, bootstrap_param.errorRange); // enc 0
 
-    // regevDec_Value(msg, lwe_ct_list, lwe_sk, lwe_params);
-    // cout << "Input Ciphertex: \n" << msg << endl;
 
     ////////////////////////////////////////////// ENCRYPT SK UNDER BFV ////////////////////////////////////////////////
 
@@ -111,19 +108,6 @@ int main() {
 
     /////////////////////////////////////////////////// BOOTSTRAP //////////////////////////////////////////////////////
     vector<uint64_t> q_shift_constant(ring_dim, 0);
-    // vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
-    //                                                    ring_dim, n, p, ksk, rangeCheckIndices_squareRoot, my_pool, bfv_secret_key,
-    //                                                    q_shift_constant, 0, false, false);
-
-
-/**
- * @brief vector<regevCiphertext>& lwe_ct_list, Ciphertext& lwe_sk_encrypted, const SEALContext& seal_context,
-                                  const RelinKeys& relin_keys, const GaloisKeys& gal_keys, const int ring_dim, const int n,
-                                  const int p, const KSwitchKeys& ksk, const vector<uint64_t>& rangeCheckIndices,
-                                  const MemoryPoolHandle& my_pool, const SecretKey& bfv_secret_key, const vector<uint64_t>& q_shift_constant,
-                                  const int f_zero = 0, const bool gateEval = false, const bool skip_first_odd = true, const int baseDegree = 256) {
- * 
- */
     vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
                                                        ring_dim, n, p, ksk, rangeCheckIndices_squareRoot, my_pool, bfv_secret_key,
                                                        q_shift_constant, 0, false, false, bootstrap_param.firstLevelDegree, bootstrap_param.secondLevelDegree);
