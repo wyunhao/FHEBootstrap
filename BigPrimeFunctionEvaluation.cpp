@@ -89,7 +89,9 @@ int main() {
     auto lwe_sk = regevGenerateSecretKey(lwe_params);
     for (int i = 0; i < n; i++) {
         lwe_sk[i] = (int) new_key.data()[i] > p ? p-1 : new_key.data()[i];
+        cout << new_key.data()[i] << " ";
     }
+    cout << endl;
 
     seal::util::RNSIter new_key_rns(new_key.data().data(), ring_dim);
     ntt_negacyclic_harvey(new_key_rns, coeff_modulus.size(), seal_context.key_context_data()->small_ntt_tables());
@@ -108,7 +110,8 @@ int main() {
     vector<uint64_t> q_shift_constant(ring_dim, 0);
     vector<regevCiphertext> lwe_ct_results = bootstrap_bigPrime(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
                                                        ring_dim, n, p, ksk, rangeCheckIndices_squareRoot_20, my_pool, bfv_secret_key,
-                                                       q_shift_constant, 0, false, false, bootstrap_param.firstLevelDegree, bootstrap_param.secondLevelDegree);
+                                                       q_shift_constant, 0, false, false, bootstrap_param.firstLevelDegree, bootstrap_param.secondLevelDegree,
+                                                       1152921504581419009);
 
 
     regevDec_Value(msg, lwe_ct_results, lwe_sk, lwe_params, bootstrap_param.errorRange);

@@ -707,12 +707,21 @@ vector<regevCiphertext> preprocess_NAND(const vector<regevCiphertext>& ct_list_1
 }
 
 
+void modDownToPrime(Ciphertext& coeff, const int ring_dim, const uint64_t big_prime, const uint64_t small_prime=268369921) {
+    for (int i = 0; i < ring_dim; i++) {
+        coeff.data(1)[i] =  (coeff.data(1)[i]) * small_prime / big_prime;
+        coeff.data(0)[i] =  (coeff.data(0)[i]) * small_prime / big_prime;
+    }
+}
+
+
 vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list, Ciphertext& lwe_sk_encrypted, const SEALContext& seal_context,
                                            const RelinKeys& relin_keys, const GaloisKeys& gal_keys, const int ring_dim, const int n,
                                            const int p, const KSwitchKeys& ksk, const vector<uint64_t>& rangeCheckIndices,
                                            const MemoryPoolHandle& my_pool, const SecretKey& bfv_secret_key, const vector<uint64_t>& q_shift_constant,
                                            const int f_zero = 0, const bool gateEval = false, const bool skip_first_odd = true,
-                                           const int firstDegree = 256, const int secondDegree = 256) {
+                                           const int firstDegree = 256, const int secondDegree = 256, const uint64_t bigPrime = 268369921,
+                                           const uint64_t smallPrime = 268369921) {
     chrono::high_resolution_clock::time_point time_start, time_end;
     uint64_t total_preprocess = 0, total_online = 0;
 
@@ -806,6 +815,12 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
       cout << pl[i] << ",";
     }
     cout << endl;
+
+
+    ////////////////////////////////////////////////// MANUAL MOD DOWN /////////////////////////////////////////////////
+
+    modDownToPrime(coeff, ring_dim, bigPrime, smallPrime);
+
 
     ////////////////////////////////////////////////// KEY SWITCHING ///////////////////////////////////////////////////
 
