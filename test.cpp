@@ -14,8 +14,8 @@ int main() {
 
 
     ////////////////////////////////////////////// PREPARE (R)LWE PARAMS ///////////////////////////////////////////////
-    int ring_dim = 32768;
-    int n = 1024;
+    int ring_dim = 8;
+    int n = 4;
     int p = prime_p;
 
     EncryptionParameters bfv_params(scheme_type::bfv);
@@ -75,11 +75,11 @@ int main() {
     }
     keygen.create_galois_keys(rot_steps, gal_keys);
 
-    // vector<uint64_t> msg = {21845, 21845, 32768, 32768, 0, 0, 43691, 43691};
-    vector<uint64_t> msg(ring_dim);
-    for (int i = 0; i< 10; i++) {
-        msg[i] = (i % 4096) * 192;
-    } //= {0, 21845, 32768, 43490, 10922, 30000, 50000, 20000};
+    vector<uint64_t> msg = {0, 21845, 32768, 43490, 10922, 30000, 50000, 20000};
+    // vector<uint64_t> msg(ring_dim);
+    // for (int i = 0; i< ring_dim; i++) {
+    //     msg[i] = (i % 4096) * 192;
+    // } //= {0, 21845, 32768, 43490, 10922, 30000, 50000, 20000};
     Plaintext pl;
     Ciphertext c;
     batch_encoder.encode(msg, pl);
@@ -87,26 +87,30 @@ int main() {
 
 
     Plaintext pl_1;
-    batch_encoder.encode(msg, pl_1);
-
-
-    chrono::high_resolution_clock::time_point time_start, time_end;
-
-    time_start = chrono::high_resolution_clock::now();
-    for (int i = 0; i< 10; i++) {
-        evaluator.multiply_plain_inplace(c, pl_1);
+    pl_1.resize(ring_dim);
+    pl_1.parms_id() = parms_id_zero;
+    cout << "?\n";
+    pl_1.data()[0] = 2;
+    for (int i = 1; i < ring_dim; i++) {
+        pl_1.data()[i] = 0;
     }
-    time_end = chrono::high_resolution_clock::now();
-    cout << "Pl Multi: " << chrono::duration_cast<chrono::microseconds>(time_end - time_start).count() << endl;
 
-    Ciphertext c1;
-    encryptor.encrypt(pl_1, c1);
-    time_start = chrono::high_resolution_clock::now();
-    for (int i = 0; i< 10; i++) {
-        evaluator.multiply_inplace(c, c1);
-    }
-    time_end = chrono::high_resolution_clock::now();
-    cout << "Ct Multi: " << chrono::duration_cast<chrono::microseconds>(time_end - time_start).count() << endl;
+    cout << "Before multi..\n";
+    evaluator.multiply_plain_inplace(c, pl_1);
+
+    decryptor.decrypt(c, pl);
+    batch_encoder.decode(pl, msg);
+    cout << "Decrypted : " << msg << endl;
+
+
+    // Ciphertext c1;
+    // encryptor.encrypt(pl_1, c1);
+    // time_start = chrono::high_resolution_clock::now();
+    // for (int i = 0; i< 10; i++) {
+    //     evaluator.multiply_inplace(c, c1);
+    // }
+    // time_end = chrono::high_resolution_clock::now();
+    // cout << "Ct Multi: " << chrono::duration_cast<chrono::microseconds>(time_end - time_start).count() << endl;
 
 
 

@@ -436,14 +436,21 @@ void Bootstrap_RangeCheck_PatersonStockmeyer_bigPrime(Ciphertext& ciphertext, co
 
     Ciphertext temp_relin(context);
 
+    Plaintext plainInd;
+    plainInd.resize(degree);
+    plainInd.parms_id() = parms_id_zero;
+    for (int i = 0; i < degree; i++) {
+        plainInd.data()[i] = 0;
+    }
+
     for(int i = 0; i < secondDegree; i++) {
         Ciphertext levelSum;
         bool flag = false;
         for(int j = 0; j < firstDegree; j++) {
             if(rangeCheckIndices[i*firstDegree+j] != 0) {
-                vector<uint64_t> intInd(degree, rangeCheckIndices[i*firstDegree+j]);
-                Plaintext plainInd;
-                batch_encoder.encode(intInd, plainInd);
+                // vector<uint64_t> intInd(degree, rangeCheckIndices[i*firstDegree+j]);
+                plainInd.data()[0] = rangeCheckIndices[i*firstDegree+j];
+                // batch_encoder.encode(intInd, plainInd);
                 if (!flag) {
                     evaluator.multiply_plain(kCTs[j], plainInd, levelSum);
                     flag = true;
@@ -476,9 +483,10 @@ void Bootstrap_RangeCheck_PatersonStockmeyer_bigPrime(Ciphertext& ciphertext, co
     evaluator.add_inplace(ciphertext, temp_relin);
     temp_relin.release();
 
-    vector<uint64_t> intInd(degree, f_zero);
-    Plaintext plainInd;
-    batch_encoder.encode(intInd, plainInd);
+    // vector<uint64_t> intInd(degree, f_zero); 
+    // Plaintext plainInd;
+    plainInd.data()[0] = f_zero;
+    // batch_encoder.encode(intInd, plainInd);
     evaluator.negate_inplace(ciphertext);
     evaluator.add_plain_inplace(ciphertext, plainInd);
 
@@ -504,23 +512,33 @@ void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphe
     vector<Ciphertext> kToMCTs(secondDegree);
     calUptoDegreeK(kToMCTs, kCTs[kCTs.size()-1], secondDegree, relin_keys, context);
 
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < (int) kCTs.size(); j++) {
-            evaluator.mod_switch_to_next_inplace(kCTs[j]);
-        }
+    for (int j = 0; j < (int) kCTs.size(); j++) {
+        evaluator.mod_switch_to_inplace(kCTs[j], kToMCTs[kToMCTs.size()-1].parms_id());
     }
+    cout << "Noise for last: " << decryptor.invariant_noise_budget(kToMCTs[kToMCTs.size()-1]) << " bits\n";
+    for (int j = 0; j < (int) kToMCTs.size(); j++) {
+        evaluator.mod_switch_to_next_inplace(kToMCTs[j]);
+    }
+    cout << "Noise for last: " << decryptor.invariant_noise_budget(kToMCTs[kToMCTs.size()-1]) << " bits\n";
 
     Ciphertext temp_relin(context);
     // int third = 0;
     
+    Plaintext plainInd;
+    plainInd.resize(degree);
+    plainInd.parms_id() = parms_id_zero;
+    for (int i = 0; i < degree; i++) {
+        plainInd.data()[i] = 0;
+    }
+
     for(int i = 0; i < secondDegree; i++) {
         Ciphertext levelSum;
         bool flag = false;
         for(int j = 0; j < firstDegree; j++) {
             if(rangeCheckIndices[i*firstDegree+j] != 0) {
-                vector<uint64_t> intInd(degree, rangeCheckIndices[i*firstDegree+j]);
-                Plaintext plainInd;
-                batch_encoder.encode(intInd, plainInd);
+                // vector<uint64_t> intInd(degree, rangeCheckIndices[i*firstDegree+j]);
+                plainInd.data()[0] = rangeCheckIndices[i*firstDegree+j];
+                // batch_encoder.encode(intInd, plainInd);
                 if (!flag) {
                     evaluator.multiply_plain(kCTs[j], plainInd, levelSum);
                     flag = true;
@@ -556,20 +574,22 @@ void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphe
     evaluator.add_inplace(ciphertext, temp_relin);
     temp_relin.release();
 
-    vector<uint64_t> intInd(degree, f_zero); 
-    Plaintext plainInd;
-    batch_encoder.encode(intInd, plainInd);
+    // vector<uint64_t> intInd(degree, f_zero); 
+    // Plaintext plainInd;
+    plainInd.data()[0] = f_zero;
+    // batch_encoder.encode(intInd, plainInd);
     evaluator.negate_inplace(ciphertext);
     evaluator.add_plain_inplace(ciphertext, plainInd);
 
     cout << "Noise after function: " << decryptor.invariant_noise_budget(ciphertext) << " bits\n";
 
     if (gateEval) { // flip 0 to q/3, q/3 to 0
-        vector<uint64_t> flip_constant(degree, modulus/3); 
-        Plaintext flip_pl;
-        batch_encoder.encode(flip_constant, flip_pl);
+        // vector<uint64_t> flip_constant(degree, modulus/3); 
+        // Plaintext flip_pl;
+        plainInd.data()[0] = modulus/3;
+        // batch_encoder.encode(flip_constant, flip_pl);
         evaluator.negate_inplace(ciphertext);
-        evaluator.add_plain_inplace(ciphertext, flip_pl);
+        evaluator.add_plain_inplace(ciphertext, plainInd);
     }
     
     MemoryManager::SwitchProfile(std::move(old_prof_larger));
@@ -921,23 +941,30 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
         evaluator.transform_to_ntt_inplace(ct_sqrt_list[i+sq_ct]);
     }
 
-    vector<Plaintext> U_plain_list(ring_dim);
-    for (int iter = 0; iter < sq_ct; iter++) {
-        for (int j = 0; j < (int) ct_sqrt_list.size(); j++) {
-            vector<uint64_t> U_tmp = readUtemp(j*sq_ct + iter);
-            batch_encoder.encode(U_tmp, U_plain_list[iter * ct_sqrt_list.size() + j]);
-            evaluator.transform_to_ntt_inplace(U_plain_list[iter * ct_sqrt_list.size() + j], ct_sqrt_list[j].parms_id());
-        }
-    }
+    // vector<Plaintext> U_plain_list(ring_dim);
+    // for (int iter = 0; iter < sq_ct; iter++) {
+    //     for (int j = 0; j < (int) ct_sqrt_list.size(); j++) {
+    //         vector<uint64_t> U_tmp = readUtemp(j*sq_ct + iter);
+    //         batch_encoder.encode(U_tmp, U_plain_list[iter * ct_sqrt_list.size() + j]);
+    //         evaluator.transform_to_ntt_inplace(U_plain_list[iter * ct_sqrt_list.size() + j], ct_sqrt_list[j].parms_id());
+    //     }
+    // }
     time_end = chrono::high_resolution_clock::now();
     total_preprocess += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
 
     time_start = chrono::high_resolution_clock::now();
-    Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys, ring_dim);
-    // Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, ct_sqrt_list, gal_keys, ring_dim);
+    // Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys, ring_dim);
+    Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, ct_sqrt_list, gal_keys, ring_dim);
     time_end = chrono::high_resolution_clock::now();
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for slotToCoeff: " << total_online << endl;
+
+    cout << "PLAINTEX OF SLOTTOCOEFF\n";
+    decryptor.decrypt(coeff, pl);
+    for (int i = 0; i < ring_dim; i++) {
+      cout << pl[i] << ",";
+    }
+    cout << endl;
 
     ////////////////////////////////////////////////// KEY SWITCHING ///////////////////////////////////////////////////
 
