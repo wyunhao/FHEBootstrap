@@ -114,7 +114,7 @@ int main() {
 
     /////////////////////////////////////////////////// BOOTSTRAP //////////////////////////////////////////////////////
     bool gateEval = true;
-    int f_zero = p/3;
+    int f_zero = 0;
 
     // NAND
     // vector<uint64_t> q_shift_constant_NAND(ring_dim, -p/6);

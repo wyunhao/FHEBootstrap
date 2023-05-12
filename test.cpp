@@ -14,8 +14,8 @@ int main() {
 
 
     ////////////////////////////////////////////// PREPARE (R)LWE PARAMS ///////////////////////////////////////////////
-    int ring_dim = 8;
-    int n = 4;
+    int ring_dim = 32768;
+    int n = 1024;
     int p = prime_p;
 
     EncryptionParameters bfv_params(scheme_type::bfv);
@@ -75,32 +75,41 @@ int main() {
     }
     keygen.create_galois_keys(rot_steps, gal_keys);
 
-    vector<uint64_t> msg = {0, 21845, 32768, 43490, 10922, 30000, 50000, 20000};
-    // vector<uint64_t> msg(ring_dim);
-    // for (int i = 0; i< ring_dim; i++) {
-    //     msg[i] = (i % 4096) * 192;
-    // } //= {0, 21845, 32768, 43490, 10922, 30000, 50000, 20000};
+    // vector<uint64_t> msg = {0, 21845, 32768, 43490, 10922, 30000, 50000, 20000};
+    vector<uint64_t> msg(ring_dim);
+    for (int i = 0; i< ring_dim; i++) {
+        msg[i] = (i % 4096) * 192;
+    } //= {0, 21845, 32768, 43490, 10922, 30000, 50000, 20000};
     Plaintext pl;
     Ciphertext c;
     batch_encoder.encode(msg, pl);
     encryptor.encrypt(pl, c);
 
 
-    Plaintext pl_1;
-    pl_1.resize(ring_dim);
-    pl_1.parms_id() = parms_id_zero;
-    cout << "?\n";
-    pl_1.data()[0] = 2;
-    for (int i = 1; i < ring_dim; i++) {
-        pl_1.data()[i] = 0;
-    }
+    // Plaintext pl_1;
 
-    cout << "Before multi..\n";
-    evaluator.multiply_plain_inplace(c, pl_1);
+    // Ciphertext c2;
+    // chrono::high_resolution_clock::time_point time_start, time_end;
+    // time_start = chrono::high_resolution_clock::now();
+    // for (int i = 0; i < ring_dim; i++) {
+    //     evaluator.multiply_plain(c, pl, c2);
+    // }
+    // time_end = chrono::high_resolution_clock::now();
+    // cout << "Pl Multi: " << chrono::duration_cast<chrono::microseconds>(time_end - time_start).count() << endl;
+    // pl_1.resize(ring_dim);
+    // pl_1.parms_id() = parms_id_zero;
+    // cout << "?\n";
+    // pl_1.data()[0] = 2;
+    // for (int i = 1; i < ring_dim; i++) {
+    //     pl_1.data()[i] = 0;
+    // }
 
-    decryptor.decrypt(c, pl);
-    batch_encoder.decode(pl, msg);
-    cout << "Decrypted : " << msg << endl;
+    // cout << "Before multi..\n";
+    // evaluator.multiply_plain_inplace(c, pl_1);
+
+    // decryptor.decrypt(c, pl);
+    // batch_encoder.decode(pl, msg);
+    // cout << "Decrypted : " << msg << endl;
 
 
     // Ciphertext c1;
@@ -202,40 +211,50 @@ int main() {
     // encryptor.encrypt(pl, c);
 
 
-    // Ciphertext c_copy(c);
+    Ciphertext c_copy(c);
 
-    // int sq_ct = sqrt(ring_dim/2);
-    // vector<Ciphertext> ct_sqrt_list(2*sq_ct);
+    int sq_ct = sqrt(ring_dim/2);
+    vector<Ciphertext> ct_sqrt_list(2*sq_ct);
 
-    // evaluator.rotate_columns_inplace(c_copy, gal_keys);
-    // for (int i = 0; i < sq_ct; i++) {
-    //     evaluator.rotate_rows(c, sq_ct * i, gal_keys, ct_sqrt_list[i]);
-    //     evaluator.transform_to_ntt_inplace(ct_sqrt_list[i]);
-    //     evaluator.rotate_rows(c_copy, sq_ct * i, gal_keys, ct_sqrt_list[i+sq_ct]);
-    //     evaluator.transform_to_ntt_inplace(ct_sqrt_list[i+sq_ct]);
+    evaluator.rotate_columns_inplace(c_copy, gal_keys);
+    for (int i = 0; i < sq_ct; i++) {
+        evaluator.rotate_rows(c, sq_ct * i, gal_keys, ct_sqrt_list[i]);
+        evaluator.transform_to_ntt_inplace(ct_sqrt_list[i]);
+        evaluator.rotate_rows(c_copy, sq_ct * i, gal_keys, ct_sqrt_list[i+sq_ct]);
+        evaluator.transform_to_ntt_inplace(ct_sqrt_list[i+sq_ct]);
+    }
+
+    // evaluator.rotate_rows_inplace(c, 1, gal_keys);
+
+    // decryptor.decrypt(c, pl);
+    // batch_encoder.decode(pl, msg);
+    // cout << "Decode: " << msg << endl;
+
+
+    // for (int i = 0; i < ct_sqrt_list.size(); i++) {
+    //     Plaintext pp;
+    //     vector<uint64_t> v(ring_dim);
+
+    //     evaluator.transform_from_ntt_inplace(ct_sqrt_list[i]);
+
+    //     decryptor.decrypt(ct_sqrt_list[i], pp);
+    //     batch_encoder.decode(pp, v);
+    //     cout << v << endl;
+
     // }
 
-    // // evaluator.rotate_rows_inplace(c, 1, gal_keys);
-
-    // // decryptor.decrypt(c, pl);
-    // // batch_encoder.decode(pl, msg);
-    // // cout << "Decode: " << msg << endl;
-
-
-    // // for (int i = 0; i < ct_sqrt_list.size(); i++) {
-    // //     Plaintext pp;
-    // //     vector<uint64_t> v(ring_dim);
-
-    // //     evaluator.transform_from_ntt_inplace(ct_sqrt_list[i]);
-
-    // //     decryptor.decrypt(ct_sqrt_list[i], pp);
-    // //     batch_encoder.decode(pp, v);
-    // //     cout << v << endl;
-
-    // // }
+    vector<Plaintext> U_plain_list(ring_dim);
+    vector<uint64_t> U_tmp;
+    for (int iter = 0; iter < sq_ct; iter++) {
+        for (int j = 0; j < (int) ct_sqrt_list.size(); j++) {
+            U_tmp = readUtemp(j*sq_ct + iter);
+            batch_encoder.encode(U_tmp, U_plain_list[iter * ct_sqrt_list.size() + j]);
+            evaluator.transform_to_ntt_inplace(U_plain_list[iter * ct_sqrt_list.size() + j], ct_sqrt_list[j].parms_id());
+        }
+    }
 
 
-    // Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, ct_sqrt_list, gal_keys, ring_dim);
+    Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, ct_sqrt_list, gal_keys, ring_dim);
 
     // // evaluator.rotate_columns_inplace(c, gal_keys);
 

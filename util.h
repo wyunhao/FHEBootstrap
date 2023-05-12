@@ -343,10 +343,14 @@ Ciphertext slotToCoeff(const SEALContext& context, vector<Ciphertext>& ct_sqrt_l
 Ciphertext slotToCoeff_WOPrepreocess(const SEALContext& context, vector<Ciphertext>& ct_sqrt_list, const GaloisKeys& gal_keys, const int degree=poly_modulus_degree_glb, const int q=65537) {
     Evaluator evaluator(context);
     BatchEncoder batch_encoder(context);
-    vector<vector<int>> U = generateMatrixU_transpose(degree, q);
-    int sq_rt = sqrt(degree/2);
 
     chrono::high_resolution_clock::time_point time_start, time_end;
+    time_start = chrono::high_resolution_clock::now();
+    vector<vector<int>> U = generateMatrixU_transpose(degree, q);
+    time_end = chrono::high_resolution_clock::now();
+    total_U += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
+    int sq_rt = sqrt(degree/2);
+
     uint64_t total_U = 0;
 
     vector<Ciphertext> result(sq_rt);
@@ -367,12 +371,13 @@ Ciphertext slotToCoeff_WOPrepreocess(const SEALContext& context, vector<Cipherte
                 U_tmp[i] = U[row_index][col_index];
             }
             writeUtemp(U_tmp, j*sq_rt + iter);
-            time_end = chrono::high_resolution_clock::now();
-            total_U += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
 
             Plaintext U_plain;
             batch_encoder.encode(U_tmp, U_plain);
             evaluator.transform_to_ntt_inplace(U_plain, ct_sqrt_list[j].parms_id());
+
+            time_end = chrono::high_resolution_clock::now();
+            total_U += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
 
             if (j == 0) {
                 evaluator.multiply_plain(ct_sqrt_list[j], U_plain, result[iter]);
@@ -439,7 +444,7 @@ void Bootstrap_RangeCheck_PatersonStockmeyer_bigPrime(Ciphertext& ciphertext, co
     Plaintext plainInd;
     plainInd.resize(degree);
     plainInd.parms_id() = parms_id_zero;
-    for (int i = 0; i < degree; i++) {
+    for (int i = 0; i < (int) degree; i++) {
         plainInd.data()[i] = 0;
     }
 
@@ -512,12 +517,19 @@ void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphe
     vector<Ciphertext> kToMCTs(secondDegree);
     calUptoDegreeK(kToMCTs, kCTs[kCTs.size()-1], secondDegree, relin_keys, context);
 
-    for (int j = 0; j < (int) kCTs.size(); j++) {
-        evaluator.mod_switch_to_inplace(kCTs[j], kToMCTs[kToMCTs.size()-1].parms_id());
-    }
-    cout << "Noise for last: " << decryptor.invariant_noise_budget(kToMCTs[kToMCTs.size()-1]) << " bits\n";
-    for (int j = 0; j < (int) kToMCTs.size(); j++) {
-        evaluator.mod_switch_to_next_inplace(kToMCTs[j]);
+    if (gateEval) {
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < (int) kCTs.size(); j++) {
+                evaluator.mod_switch_to_next_inplace(kCTs[j]);
+            }
+        }
+    } else {
+        for (int j = 0; j < (int) kCTs.size(); j++) {
+            evaluator.mod_switch_to_inplace(kCTs[j], kToMCTs[kToMCTs.size()-1].parms_id());
+        }
+        for (int j = 0; j < (int) kToMCTs.size(); j++) {
+            evaluator.mod_switch_to_next_inplace(kToMCTs[j]);
+        }
     }
     cout << "Noise for last: " << decryptor.invariant_noise_budget(kToMCTs[kToMCTs.size()-1]) << " bits\n";
 
@@ -527,7 +539,7 @@ void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphe
     Plaintext plainInd;
     plainInd.resize(degree);
     plainInd.parms_id() = parms_id_zero;
-    for (int i = 0; i < degree; i++) {
+    for (int i = 0; i < (int) degree; i++) {
         plainInd.data()[i] = 0;
     }
 
