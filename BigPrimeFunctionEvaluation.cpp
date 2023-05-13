@@ -66,19 +66,37 @@ int main() {
     BatchEncoder batch_encoder(seal_context);
     Decryptor decryptor(seal_context, bfv_secret_key);
 
-    GaloisKeys gal_keys;
+    GaloisKeys gal_keys, gal_keys_coeff;
     vector<int> rot_steps = {1};
     for (int i = 0; i < n;) {
         rot_steps.push_back(i);
         i += sqrt(n);
     }
+    keygen.create_galois_keys(rot_steps, gal_keys);
+    
+    vector<Modulus> coeff_modulus_last = coeff_modulus;
+    coeff_modulus_last.erase(coeff_modulus_last.begin() + 2, coeff_modulus_last.end()-1);
+    EncryptionParameters parms_last = bfv_params;
+    parms_last.set_coeff_modulus(coeff_modulus_last);
+    SEALContext seal_context_last = SEALContext(parms_last, true, sec_level_type::none);
+
+    SecretKey sk_last;
+    sk_last.data().resize(coeff_modulus_last.size() * ring_dim);
+    sk_last.parms_id() = seal_context_last.key_parms_id();
+    util::set_poly(bfv_secret_key.data().data(), ring_dim, coeff_modulus_last.size() - 1, sk_last.data().data());
+    util::set_poly(
+        bfv_secret_key.data().data() + ring_dim * (coeff_modulus.size() - 1), ring_dim, 1,
+        sk_last.data().data() + ring_dim * (coeff_modulus_last.size() - 1));
+
+    vector<int> rot_steps_coeff = {1};
     for (int i = 0; i < ring_dim/2;) {
-        if (find(rot_steps.begin(), rot_steps.end(), i) == rot_steps.end()) {
-            rot_steps.push_back(i);
+        if (find(rot_steps_coeff.begin(), rot_steps_coeff.end(), i) == rot_steps_coeff.end()) {
+            rot_steps_coeff.push_back(i);
         }
         i += sqrt(ring_dim/2);
     }
-    keygen.create_galois_keys(rot_steps, gal_keys);
+    KeyGenerator keygen_last(seal_context_last, sk_last);
+    keygen_last.create_galois_keys(rot_steps_coeff, gal_keys_coeff);
 
 
     ////////////////////////////////////////////// PREPARE LWE CIPHERTEXT //////////////////////////////////////////////
@@ -89,7 +107,6 @@ int main() {
     auto lwe_sk = regevGenerateSecretKey(lwe_params);
     for (int i = 0; i < n; i++) {
         lwe_sk[i] = (int) new_key.data()[i] > p ? p-1 : new_key.data()[i];
-        cout << new_key.data()[i] << " ";
     }
     cout << endl;
 
@@ -108,7 +125,7 @@ int main() {
 
     /////////////////////////////////////////////////// BOOTSTRAP //////////////////////////////////////////////////////
     vector<uint64_t> q_shift_constant(ring_dim, 0);
-    vector<regevCiphertext> lwe_ct_results = bootstrap_bigPrime(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys,
+    vector<regevCiphertext> lwe_ct_results = bootstrap_bigPrime(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys, gal_keys_coeff,
                                                        ring_dim, n, p, ksk, rangeCheckIndices_squareRoot_20, my_pool, bfv_secret_key,
                                                        q_shift_constant, 0, false, false, bootstrap_param.firstLevelDegree, bootstrap_param.secondLevelDegree,
                                                        1152921504581419009);

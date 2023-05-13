@@ -749,8 +749,8 @@ void modDownToPrime(Ciphertext& coeff, const int ring_dim, const uint64_t big_pr
 
 
 vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list, Ciphertext& lwe_sk_encrypted, const SEALContext& seal_context,
-                                           const RelinKeys& relin_keys, const GaloisKeys& gal_keys, const int ring_dim, const int n,
-                                           const int p, const KSwitchKeys& ksk, const vector<uint64_t>& rangeCheckIndices,
+                                           const RelinKeys& relin_keys, const GaloisKeys& gal_keys, const GaloisKeys& gal_keys_coeff, const int ring_dim,
+                                           const int n, const int p, const KSwitchKeys& ksk, const vector<uint64_t>& rangeCheckIndices,
                                            const MemoryPoolHandle& my_pool, const SecretKey& bfv_secret_key, const vector<uint64_t>& q_shift_constant,
                                            const int f_zero = 0, const bool gateEval = false, const bool skip_first_odd = true,
                                            const int firstDegree = 256, const int secondDegree = 256, const uint64_t bigPrime = 268369921,
@@ -788,9 +788,9 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
 
     Plaintext pl;
     vector<uint64_t> v(ring_dim);
-    // decryptor.decrypt(result, pl);
-    // batch_encoder.decode(pl, v);
-    // cout << "Decrypt after evaluation: \n" << v << endl;
+    decryptor.decrypt(result, pl);
+    batch_encoder.decode(pl, v);
+    cout << "Decrypt after evaluation: \n" << v << endl;
 
     Ciphertext range_check_res;
     time_start = chrono::high_resolution_clock::now();
@@ -816,11 +816,11 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
     time_start = chrono::high_resolution_clock::now();
     Ciphertext range_check_res_copy(range_check_res);
 
-    evaluator.rotate_columns_inplace(range_check_res_copy, gal_keys);
+    evaluator.rotate_columns_inplace(range_check_res_copy, gal_keys_coeff);
     for (int i = 0; i < sq_ct; i++) {
-        evaluator.rotate_rows(range_check_res, sq_ct * i, gal_keys, ct_sqrt_list[i]);
+        evaluator.rotate_rows(range_check_res, sq_ct * i, gal_keys_coeff, ct_sqrt_list[i]);
         evaluator.transform_to_ntt_inplace(ct_sqrt_list[i]);
-        evaluator.rotate_rows(range_check_res_copy, sq_ct * i, gal_keys, ct_sqrt_list[i+sq_ct]);
+        evaluator.rotate_rows(range_check_res_copy, sq_ct * i, gal_keys_coeff, ct_sqrt_list[i+sq_ct]);
         evaluator.transform_to_ntt_inplace(ct_sqrt_list[i+sq_ct]);
     }
 
@@ -836,8 +836,8 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
     total_preprocess += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
 
     time_start = chrono::high_resolution_clock::now();
-    // Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys, ring_dim);
-    Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, ct_sqrt_list, gal_keys, ring_dim, p);
+    // Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys_coeff, ring_dim);
+    Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, ct_sqrt_list, gal_keys_coeff, ring_dim, p);
     time_end = chrono::high_resolution_clock::now();
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for slotToCoeff: " << total_online << endl;
@@ -883,8 +883,8 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
 }
 
 vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Ciphertext& lwe_sk_encrypted, const SEALContext& seal_context,
-                                  const RelinKeys& relin_keys, const GaloisKeys& gal_keys, const int ring_dim, const int n,
-                                  const int p, const KSwitchKeys& ksk, const vector<uint64_t>& rangeCheckIndices,
+                                  const RelinKeys& relin_keys, const GaloisKeys& gal_keys_coeffgal_keys, const GaloisKeys& gal_keys_coeff, const int ring_dim,
+                                  const int n, const int p, const KSwitchKeys& ksk, const vector<uint64_t>& rangeCheckIndices,
                                   const MemoryPoolHandle& my_pool, const SecretKey& bfv_secret_key, const vector<uint64_t>& q_shift_constant,
                                   const int f_zero = 0, const bool gateEval = false, const bool skip_first_odd = true,
                                   const int firstDegree = 256, const int secondDegree = 256) {
@@ -946,11 +946,11 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
     time_start = chrono::high_resolution_clock::now();
     Ciphertext range_check_res_copy(range_check_res);
 
-    evaluator.rotate_columns_inplace(range_check_res_copy, gal_keys);
+    evaluator.rotate_columns_inplace(range_check_res_copy, gal_keys_coeff);
     for (int i = 0; i < sq_ct; i++) {
-        evaluator.rotate_rows(range_check_res, sq_ct * i, gal_keys, ct_sqrt_list[i]);
+        evaluator.rotate_rows(range_check_res, sq_ct * i, gal_keys_coeff, ct_sqrt_list[i]);
         evaluator.transform_to_ntt_inplace(ct_sqrt_list[i]);
-        evaluator.rotate_rows(range_check_res_copy, sq_ct * i, gal_keys, ct_sqrt_list[i+sq_ct]);
+        evaluator.rotate_rows(range_check_res_copy, sq_ct * i, gal_keys_coeff, ct_sqrt_list[i+sq_ct]);
         evaluator.transform_to_ntt_inplace(ct_sqrt_list[i+sq_ct]);
     }
 
@@ -966,8 +966,8 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
     total_preprocess += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
 
     time_start = chrono::high_resolution_clock::now();
-    // Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys, ring_dim);
-    Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, ct_sqrt_list, gal_keys, ring_dim);
+    // Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys_coeff, ring_dim);
+    Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, ct_sqrt_list, gal_keys_coeff, ring_dim);
     time_end = chrono::high_resolution_clock::now();
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for slotToCoeff: " << total_online << endl;
