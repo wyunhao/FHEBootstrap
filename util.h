@@ -345,13 +345,14 @@ Ciphertext slotToCoeff_WOPrepreocess(const SEALContext& context, vector<Cipherte
     BatchEncoder batch_encoder(context);
 
     chrono::high_resolution_clock::time_point time_start, time_end;
+    uint64_t total_U = 0;
+
     time_start = chrono::high_resolution_clock::now();
     vector<vector<int>> U = generateMatrixU_transpose(degree, q);
     time_end = chrono::high_resolution_clock::now();
     total_U += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     int sq_rt = sqrt(degree/2);
 
-    uint64_t total_U = 0;
 
     vector<Ciphertext> result(sq_rt);
     for (int iter = 0; iter < sq_rt; iter++) {
@@ -517,20 +518,20 @@ void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphe
     vector<Ciphertext> kToMCTs(secondDegree);
     calUptoDegreeK(kToMCTs, kCTs[kCTs.size()-1], secondDegree, relin_keys, context);
 
-    if (gateEval) {
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < (int) kCTs.size(); j++) {
-                evaluator.mod_switch_to_next_inplace(kCTs[j]);
-            }
-        }
-    } else {
+    // if (gateEval) {
+    //     for (int i = 0; i < 3; i++) {
+    //         for (int j = 0; j < (int) kCTs.size(); j++) {
+    //             evaluator.mod_switch_to_next_inplace(kCTs[j]);
+    //         }
+    //     }
+    // } else {
         for (int j = 0; j < (int) kCTs.size(); j++) {
             evaluator.mod_switch_to_inplace(kCTs[j], kToMCTs[kToMCTs.size()-1].parms_id());
         }
         for (int j = 0; j < (int) kToMCTs.size(); j++) {
             evaluator.mod_switch_to_next_inplace(kToMCTs[j]);
         }
-    }
+    // }
     cout << "Noise for last: " << decryptor.invariant_noise_budget(kToMCTs[kToMCTs.size()-1]) << " bits\n";
 
     Ciphertext temp_relin(context);
