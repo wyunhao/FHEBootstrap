@@ -72,7 +72,7 @@ int main() {
     keygen.create_galois_keys(rot_steps, gal_keys);
     
     vector<Modulus> coeff_modulus_last = coeff_modulus;
-    coeff_modulus_last.erase(coeff_modulus_last.begin() + 2, coeff_modulus_last.end()-1);
+    coeff_modulus_last.erase(coeff_modulus_last.begin() + 3, coeff_modulus_last.end()-1);
     EncryptionParameters parms_last = bfv_params;
     parms_last.set_coeff_modulus(coeff_modulus_last);
     SEALContext seal_context_last = SEALContext(parms_last, true, sec_level_type::none);
@@ -169,8 +169,9 @@ int main() {
             q_shift_constant[i] = p/6;
         }
     }
-    vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys, gal_keys_coeff,
-                                                       ring_dim, n, p, ksk, rangeCheckIndices_gateEvaluation, my_pool, bfv_secret_key, q_shift_constant, f_zero, gateEval);
+    vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, seal_context_last, relin_keys, gal_keys, gal_keys_coeff,
+                                                       ring_dim, n, p, ksk, rangeCheckIndices_gateEvaluation, my_pool, bfv_secret_key, q_shift_constant,
+                                                       f_zero, gateEval);
     regevDec_Mod3_Mixed(msg, lwe_ct_results, lwe_sk, lwe_params);
 
 

@@ -126,8 +126,8 @@ int main() {
 
     /////////////////////////////////////////////////// BOOTSTRAP //////////////////////////////////////////////////////
     vector<uint64_t> q_shift_constant(ring_dim, 0);
-    vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, relin_keys, gal_keys, gal_keys_coeff,
-                                                       ring_dim, n, p, ksk, rangeCheckIndices_squareRoot, my_pool, bfv_secret_key,
+    vector<regevCiphertext> lwe_ct_results = bootstrap(lwe_ct_list, lwe_sk_encrypted, seal_context, seal_context_last, relin_keys, gal_keys,
+                                                       gal_keys_coeff, ring_dim, n, p, ksk, rangeCheckIndices_squareRoot, my_pool, bfv_secret_key,
                                                        q_shift_constant, 0, false, false, bootstrap_param.firstLevelDegree, bootstrap_param.secondLevelDegree);
 
 

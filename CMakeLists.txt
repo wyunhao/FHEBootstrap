@@ -45,6 +45,6 @@ else()
     link_libraries( ${PALISADE_SHARED_LIBRARIES} )
 endif()
 
-add_executable( bootstrap BigPrimeFunctionEvaluation.cpp )
+add_executable( bootstrap GateEvaluation.cpp )
 
 target_link_libraries(bootstrap SEAL::seal ntl m gmp)

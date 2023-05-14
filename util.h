@@ -217,6 +217,7 @@ Ciphertext evaluatePackedLWECiphertext(const SEALContext& seal_context, vector<r
     }
 
     // sum up all sq_rt tmp results to the first one, each first rotate left one and add to the previous tmp result
+
     for (int iter = sq_rt-1; iter > 0; iter--) {
         evaluator.rotate_rows_inplace(result[iter], 1, gal_keys);
         evaluator.add_inplace(result[iter-1], result[iter]);
@@ -292,8 +293,9 @@ vector<uint64_t> readUtemp(const int i, const int degree=poly_modulus_degree_glb
  * @param degree 
  * @return Ciphertext 
  */
-Ciphertext slotToCoeff(const SEALContext& context, vector<Ciphertext>& ct_sqrt_list, vector<Plaintext>& U_plain_list_c, const GaloisKeys& gal_keys, const int degree=poly_modulus_degree_glb) {
-    Evaluator evaluator(context);
+Ciphertext slotToCoeff(const SEALContext& context, const SEALContext& context_coeff, vector<Ciphertext>& ct_sqrt_list, vector<Plaintext>& U_plain_list_c,
+                       const GaloisKeys& gal_keys, const int degree=poly_modulus_degree_glb) {
+    Evaluator evaluator(context), eval_coeff(context_coeff);
     BatchEncoder batch_encoder(context);
     int sq_rt = sqrt(degree/2);
     vector<Plaintext> U_plain_list(U_plain_list_c);
@@ -322,7 +324,7 @@ Ciphertext slotToCoeff(const SEALContext& context, vector<Ciphertext>& ct_sqrt_l
     }
 
     for (int iter = sq_rt-1; iter > 0; iter--) {
-        evaluator.rotate_rows_inplace(result[iter], 1, gal_keys);
+        eval_coeff.rotate_rows_inplace(result[iter], 1, gal_keys);
         evaluator.add_inplace(result[iter-1], result[iter]);
     }
 
@@ -340,8 +342,9 @@ Ciphertext slotToCoeff(const SEALContext& context, vector<Ciphertext>& ct_sqrt_l
  * @param degree 
  * @return Ciphertext 
  */
-Ciphertext slotToCoeff_WOPrepreocess(const SEALContext& context, vector<Ciphertext>& ct_sqrt_list, const GaloisKeys& gal_keys, const int degree=poly_modulus_degree_glb, const int q=65537) {
-    Evaluator evaluator(context);
+Ciphertext slotToCoeff_WOPrepreocess(const SEALContext& context, const SEALContext& context_coeff, vector<Ciphertext>& ct_sqrt_list, const GaloisKeys& gal_keys,
+                                     const int degree=poly_modulus_degree_glb, const int q=65537) {
+    Evaluator evaluator(context), eval_coeff(context_coeff);
     BatchEncoder batch_encoder(context);
 
     chrono::high_resolution_clock::time_point time_start, time_end;
@@ -395,7 +398,7 @@ Ciphertext slotToCoeff_WOPrepreocess(const SEALContext& context, vector<Cipherte
     }
 
     for (int iter = sq_rt-1; iter > 0; iter--) {
-        evaluator.rotate_rows_inplace(result[iter], 1, gal_keys);
+        eval_coeff.rotate_rows_inplace(result[iter], 1, gal_keys);
         evaluator.add_inplace(result[iter-1], result[iter]);
     }
 
@@ -749,12 +752,12 @@ void modDownToPrime(Ciphertext& coeff, const int ring_dim, const uint64_t big_pr
 
 
 vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list, Ciphertext& lwe_sk_encrypted, const SEALContext& seal_context,
-                                           const RelinKeys& relin_keys, const GaloisKeys& gal_keys, const GaloisKeys& gal_keys_coeff, const int ring_dim,
-                                           const int n, const int p, const KSwitchKeys& ksk, const vector<uint64_t>& rangeCheckIndices,
-                                           const MemoryPoolHandle& my_pool, const SecretKey& bfv_secret_key, const vector<uint64_t>& q_shift_constant,
-                                           const int f_zero = 0, const bool gateEval = false, const bool skip_first_odd = true,
-                                           const int firstDegree = 256, const int secondDegree = 256, const uint64_t bigPrime = 268369921,
-                                           const uint64_t smallPrime = 268369921) {
+                                           const SEALContext& seal_context_last, const RelinKeys& relin_keys, const GaloisKeys& gal_keys,
+                                           const GaloisKeys& gal_keys_coeff, const int ring_dim, const int n, const int p, const KSwitchKeys& ksk,
+                                           const vector<uint64_t>& rangeCheckIndices, const MemoryPoolHandle& my_pool, const SecretKey& bfv_secret_key,
+                                           const vector<uint64_t>& q_shift_constant, const int f_zero = 0, const bool gateEval = false,
+                                           const bool skip_first_odd = true, const int firstDegree = 256, const int secondDegree = 256,
+                                           const uint64_t bigPrime = 268369921, const uint64_t smallPrime = 268369921) {
     chrono::high_resolution_clock::time_point time_start, time_end;
     uint64_t total_preprocess = 0, total_online = 0;
 
@@ -837,7 +840,7 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
 
     time_start = chrono::high_resolution_clock::now();
     // Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys_coeff, ring_dim);
-    Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, ct_sqrt_list, gal_keys_coeff, ring_dim, p);
+    Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, seal_context_last, ct_sqrt_list, gal_keys_coeff, ring_dim, p);
     time_end = chrono::high_resolution_clock::now();
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for slotToCoeff: " << total_online << endl;
@@ -883,11 +886,11 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
 }
 
 vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Ciphertext& lwe_sk_encrypted, const SEALContext& seal_context,
-                                  const RelinKeys& relin_keys, const GaloisKeys& gal_keys_coeffgal_keys, const GaloisKeys& gal_keys_coeff, const int ring_dim,
-                                  const int n, const int p, const KSwitchKeys& ksk, const vector<uint64_t>& rangeCheckIndices,
-                                  const MemoryPoolHandle& my_pool, const SecretKey& bfv_secret_key, const vector<uint64_t>& q_shift_constant,
-                                  const int f_zero = 0, const bool gateEval = false, const bool skip_first_odd = true,
-                                  const int firstDegree = 256, const int secondDegree = 256) {
+                                  const SEALContext& seal_context_last, const RelinKeys& relin_keys, const GaloisKeys& gal_keys,
+                                  const GaloisKeys& gal_keys_coeff, const int ring_dim, const int n, const int p, const KSwitchKeys& ksk,
+                                  const vector<uint64_t>& rangeCheckIndices, const MemoryPoolHandle& my_pool, const SecretKey& bfv_secret_key,
+                                  const vector<uint64_t>& q_shift_constant, const int f_zero = 0, const bool gateEval = false,
+                                  const bool skip_first_odd = true, const int firstDegree = 256, const int secondDegree = 256) {
     chrono::high_resolution_clock::time_point time_start, time_end;
     uint64_t total_preprocess = 0, total_online = 0;
 
@@ -901,6 +904,12 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
     Ciphertext lwe_sk_column;
 
     time_start = chrono::high_resolution_clock::now();
+    auto context_data_ptr = seal_context.get_context_data(lwe_sk_encrypted.parms_id());
+
+    if (gal_keys.parms_id() != seal_context.key_parms_id())
+    {
+        cout << "not right...";
+    }
     evaluator.rotate_columns(lwe_sk_encrypted, gal_keys, lwe_sk_column);
     for (int i = 0; i < sq_sk; i++) {
         evaluator.rotate_rows(lwe_sk_encrypted, sq_sk * i, gal_keys, lwe_sk_sqrt_list[i]);
@@ -918,9 +927,9 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
 
     Plaintext pl;
     vector<uint64_t> v(ring_dim);
-    // decryptor.decrypt(result, pl);
-    // batch_encoder.decode(pl, v);
-    // cout << "Decrypt after evaluation: \n" << v << endl;
+    decryptor.decrypt(result, pl);
+    batch_encoder.decode(pl, v);
+    cout << "Decrypt after evaluation: \n" << v << endl;
 
     Ciphertext range_check_res;
     time_start = chrono::high_resolution_clock::now();
@@ -946,12 +955,13 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
     time_start = chrono::high_resolution_clock::now();
     Ciphertext range_check_res_copy(range_check_res);
 
-    evaluator.rotate_columns_inplace(range_check_res_copy, gal_keys_coeff);
+    Evaluator eval_coeff(seal_context_last);
+    eval_coeff.rotate_columns_inplace(range_check_res_copy, gal_keys_coeff);
     for (int i = 0; i < sq_ct; i++) {
-        evaluator.rotate_rows(range_check_res, sq_ct * i, gal_keys_coeff, ct_sqrt_list[i]);
-        evaluator.transform_to_ntt_inplace(ct_sqrt_list[i]);
-        evaluator.rotate_rows(range_check_res_copy, sq_ct * i, gal_keys_coeff, ct_sqrt_list[i+sq_ct]);
-        evaluator.transform_to_ntt_inplace(ct_sqrt_list[i+sq_ct]);
+        eval_coeff.rotate_rows(range_check_res, sq_ct * i, gal_keys_coeff, ct_sqrt_list[i]);
+        eval_coeff.transform_to_ntt_inplace(ct_sqrt_list[i]);
+        eval_coeff.rotate_rows(range_check_res_copy, sq_ct * i, gal_keys_coeff, ct_sqrt_list[i+sq_ct]);
+        eval_coeff.transform_to_ntt_inplace(ct_sqrt_list[i+sq_ct]);
     }
 
     // vector<Plaintext> U_plain_list(ring_dim);
@@ -967,7 +977,7 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
 
     time_start = chrono::high_resolution_clock::now();
     // Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys_coeff, ring_dim);
-    Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, ct_sqrt_list, gal_keys_coeff, ring_dim);
+    Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, seal_context_last, ct_sqrt_list, gal_keys_coeff, ring_dim);
     time_end = chrono::high_resolution_clock::now();
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for slotToCoeff: " << total_online << endl;
