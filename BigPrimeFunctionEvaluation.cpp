@@ -23,7 +23,7 @@ int main() {
     EncryptionParameters bfv_params(scheme_type::bfv);
     bfv_params.set_poly_modulus_degree(ring_dim);
 
-    auto coeff_modulus = CoeffModulus::Create(ring_dim, { 60, 60, 60, 60, 60,
+    auto coeff_modulus = CoeffModulus::Create(ring_dim, { 60, 50, 50, 60, 60,
                                                           60, 60, 60, 60, 60,
                                                           60, 60, 60, 60, 60 });
     bfv_params.set_coeff_modulus(coeff_modulus);

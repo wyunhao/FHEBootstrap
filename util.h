@@ -293,12 +293,11 @@ vector<uint64_t> readUtemp(const int i, const int degree=poly_modulus_degree_glb
  * @param degree 
  * @return Ciphertext 
  */
-Ciphertext slotToCoeff(const SEALContext& context, const SEALContext& context_coeff, vector<Ciphertext>& ct_sqrt_list, vector<Plaintext>& U_plain_list_c,
+Ciphertext slotToCoeff(const SEALContext& context, const SEALContext& context_coeff, vector<Ciphertext>& ct_sqrt_list, vector<Plaintext>& U_plain_list,
                        const GaloisKeys& gal_keys, const int degree=poly_modulus_degree_glb) {
     Evaluator evaluator(context), eval_coeff(context_coeff);
     BatchEncoder batch_encoder(context);
     int sq_rt = sqrt(degree/2);
-    vector<Plaintext> U_plain_list(U_plain_list_c);
 
     chrono::high_resolution_clock::time_point time_start, time_end;
     int total_mul = 0;
@@ -457,9 +456,7 @@ void Bootstrap_RangeCheck_PatersonStockmeyer_bigPrime(Ciphertext& ciphertext, co
         bool flag = false;
         for(int j = 0; j < firstDegree; j++) {
             if(rangeCheckIndices[i*firstDegree+j] != 0) {
-                // vector<uint64_t> intInd(degree, rangeCheckIndices[i*firstDegree+j]);
                 plainInd.data()[0] = rangeCheckIndices[i*firstDegree+j];
-                // batch_encoder.encode(intInd, plainInd);
                 if (!flag) {
                     evaluator.multiply_plain(kCTs[j], plainInd, levelSum);
                     flag = true;
@@ -492,10 +489,7 @@ void Bootstrap_RangeCheck_PatersonStockmeyer_bigPrime(Ciphertext& ciphertext, co
     evaluator.add_inplace(ciphertext, temp_relin);
     temp_relin.release();
 
-    // vector<uint64_t> intInd(degree, f_zero); 
-    // Plaintext plainInd;
     plainInd.data()[0] = f_zero;
-    // batch_encoder.encode(intInd, plainInd);
     evaluator.negate_inplace(ciphertext);
     evaluator.add_plain_inplace(ciphertext, plainInd);
 
@@ -819,12 +813,13 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
     time_start = chrono::high_resolution_clock::now();
     Ciphertext range_check_res_copy(range_check_res);
 
-    evaluator.rotate_columns_inplace(range_check_res_copy, gal_keys_coeff);
+    Evaluator eval_coeff(seal_context_last);
+    eval_coeff.rotate_columns_inplace(range_check_res_copy, gal_keys_coeff);
     for (int i = 0; i < sq_ct; i++) {
-        evaluator.rotate_rows(range_check_res, sq_ct * i, gal_keys_coeff, ct_sqrt_list[i]);
-        evaluator.transform_to_ntt_inplace(ct_sqrt_list[i]);
-        evaluator.rotate_rows(range_check_res_copy, sq_ct * i, gal_keys_coeff, ct_sqrt_list[i+sq_ct]);
-        evaluator.transform_to_ntt_inplace(ct_sqrt_list[i+sq_ct]);
+        eval_coeff.rotate_rows(range_check_res, sq_ct * i, gal_keys_coeff, ct_sqrt_list[i]);
+        eval_coeff.transform_to_ntt_inplace(ct_sqrt_list[i]);
+        eval_coeff.rotate_rows(range_check_res_copy, sq_ct * i, gal_keys_coeff, ct_sqrt_list[i+sq_ct]);
+        eval_coeff.transform_to_ntt_inplace(ct_sqrt_list[i+sq_ct]);
     }
 
     // vector<Plaintext> U_plain_list(ring_dim);
@@ -839,7 +834,7 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
     total_preprocess += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
 
     time_start = chrono::high_resolution_clock::now();
-    // Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys_coeff, ring_dim);
+    // Ciphertext coeff = slotToCoeff(seal_context, seal_context_last, ct_sqrt_list, U_plain_list, gal_keys_coeff, ring_dim);
     Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, seal_context_last, ct_sqrt_list, gal_keys_coeff, ring_dim, p);
     time_end = chrono::high_resolution_clock::now();
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
@@ -906,10 +901,6 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
     time_start = chrono::high_resolution_clock::now();
     auto context_data_ptr = seal_context.get_context_data(lwe_sk_encrypted.parms_id());
 
-    if (gal_keys.parms_id() != seal_context.key_parms_id())
-    {
-        cout << "not right...";
-    }
     evaluator.rotate_columns(lwe_sk_encrypted, gal_keys, lwe_sk_column);
     for (int i = 0; i < sq_sk; i++) {
         evaluator.rotate_rows(lwe_sk_encrypted, sq_sk * i, gal_keys, lwe_sk_sqrt_list[i]);
@@ -964,14 +955,14 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
         eval_coeff.transform_to_ntt_inplace(ct_sqrt_list[i+sq_ct]);
     }
 
-    // vector<Plaintext> U_plain_list(ring_dim);
-    // for (int iter = 0; iter < sq_ct; iter++) {
-    //     for (int j = 0; j < (int) ct_sqrt_list.size(); j++) {
-    //         vector<uint64_t> U_tmp = readUtemp(j*sq_ct + iter);
-    //         batch_encoder.encode(U_tmp, U_plain_list[iter * ct_sqrt_list.size() + j]);
-    //         evaluator.transform_to_ntt_inplace(U_plain_list[iter * ct_sqrt_list.size() + j], ct_sqrt_list[j].parms_id());
-    //     }
-    // }
+    vector<Plaintext> U_plain_list(ring_dim);
+    for (int iter = 0; iter < sq_ct; iter++) {
+        for (int j = 0; j < (int) ct_sqrt_list.size(); j++) {
+            vector<uint64_t> U_tmp = readUtemp(j*sq_ct + iter);
+            batch_encoder.encode(U_tmp, U_plain_list[iter * ct_sqrt_list.size() + j]);
+            evaluator.transform_to_ntt_inplace(U_plain_list[iter * ct_sqrt_list.size() + j], ct_sqrt_list[j].parms_id());
+        }
+    }
     time_end = chrono::high_resolution_clock::now();
     total_preprocess += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
 

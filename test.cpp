@@ -36,8 +36,7 @@ int main() {
     SEALContext seal_context(bfv_params, true, sec_level_type::none);
     cout << "primitive root: " << seal_context.first_context_data()->plain_ntt_tables()->get_root() << endl;
 
-    KeyGenerator new_key_keygen(seal_context, n);
-    SecretKey new_key = new_key_keygen.secret_key();
+
     // inverse_ntt_negacyclic_harvey(new_key.data().data(), seal_context.key_context_data()->small_ntt_tables()[0]);  
 
     KeyGenerator keygen(seal_context);
@@ -46,11 +45,6 @@ int main() {
     MemoryPoolHandle my_pool = MemoryPoolHandle::New();
 
     // generate a key switching key based on key_before and secret_key
-    KSwitchKeys ksk;
-    seal::util::ConstPolyIter secret_key_before(bfv_secret_key.data().data(), ring_dim, coeff_modulus.size());
-
-    new_key_keygen.generate_kswitch_keys(secret_key_before, 1, static_cast<KSwitchKeys &>(ksk), false);
-    ksk.parms_id() = seal_context.key_parms_id();
 
     PublicKey bfv_public_key;
     keygen.create_public_key(bfv_public_key);
@@ -71,29 +65,29 @@ int main() {
     parms_last.set_coeff_modulus(coeff_modulus_last);
     SEALContext seal_context_last = SEALContext(parms_last, true, sec_level_type::none);
 
-    SecretKey sk_last;
-    sk_last.data().resize(coeff_modulus_last.size() * ring_dim);
-    sk_last.parms_id() = seal_context_last.key_parms_id();
-    util::set_poly(bfv_secret_key.data().data(), ring_dim, coeff_modulus_last.size() - 1, sk_last.data().data());
-    util::set_poly(
-        bfv_secret_key.data().data() + ring_dim * (coeff_modulus.size() - 1), ring_dim, 1,
-        sk_last.data().data() + ring_dim * (coeff_modulus_last.size() - 1));
+    // SecretKey sk_last;
+    // sk_last.data().resize(coeff_modulus_last.size() * ring_dim);
+    // sk_last.parms_id() = seal_context_last.key_parms_id();
+    // util::set_poly(bfv_secret_key.data().data(), ring_dim, coeff_modulus_last.size() - 1, sk_last.data().data());
+    // util::set_poly(
+    //     bfv_secret_key.data().data() + ring_dim * (coeff_modulus.size() - 1), ring_dim, 1,
+    //     sk_last.data().data() + ring_dim * (coeff_modulus_last.size() - 1));
 
 
-    vector<int> rot_steps_coeff = {1};
-    for (int i = 0; i < n;) {
-        rot_steps_coeff.push_back(i);
-        i += sqrt(n);
-    }
-    // for (int i = 0; i < ring_dim/2;) {
-    //     if (find(rot_steps_coeff.begin(), rot_steps_coeff.end(), i) == rot_steps_coeff.end()) {
-    //         rot_steps_coeff.push_back(i);
-    //     }
-    //     i += sqrt(ring_dim/2);
+    // vector<int> rot_steps_coeff = {1};
+    // for (int i = 0; i < n;) {
+    //     rot_steps_coeff.push_back(i);
+    //     i += sqrt(n);
     // }
-    cout << "rot_steps_coeff: " << rot_steps_coeff << endl;
-    KeyGenerator keygen_last(seal_context_last, sk_last);
-    keygen_last.create_galois_keys(rot_steps_coeff, gal_keys_coeff);
+    // // for (int i = 0; i < ring_dim/2;) {
+    // //     if (find(rot_steps_coeff.begin(), rot_steps_coeff.end(), i) == rot_steps_coeff.end()) {
+    // //         rot_steps_coeff.push_back(i);
+    // //     }
+    // //     i += sqrt(ring_dim/2);
+    // // }
+    // cout << "rot_steps_coeff: " << rot_steps_coeff << endl;
+    // KeyGenerator keygen_last(seal_context_last, sk_last);
+    // keygen_last.create_galois_keys(rot_steps_coeff, gal_keys_coeff);
 
 
     // vector<uint64_t> msg = {0, 21845, 32768, 43490, 10922, 30000, 50000, 20000};
@@ -106,26 +100,26 @@ int main() {
     batch_encoder.encode(msg, pl);
     encryptor.encrypt(pl, c);
 
-    Evaluator eval_gal(seal_context_last);
+    // Evaluator eval_gal(seal_context_last);
 
     // Ciphertext c_mod(c);
     // evaluator.mod_switch_to_next_inplace(c_mod);
 
-    cout << "before mod...\n";
-    while (seal_context.last_parms_id() != c.parms_id()) {
-        // evaluator.mod_switch_to_next_inplace(c_mod);
-        evaluator.mod_switch_to_next_inplace(c);
-    }
+    // cout << "before mod...\n";
+    // while (seal_context.last_parms_id() != c.parms_id()) {
+    //     // evaluator.mod_switch_to_next_inplace(c_mod);
+    //     evaluator.mod_switch_to_next_inplace(c);
+    // }
 
-    int sq_sk = sqrt(n);
-    Ciphertext c_column;
-    vector<Ciphertext> lwe_sk_sqrt_list(sq_sk);
-    cout << "1\n";
-    eval_gal.rotate_columns(c, gal_keys_coeff, c_column);
-    for (int i = 0; i < sq_sk; i++) {
-        cout << i << endl;
-        eval_gal.rotate_rows(c, sq_sk * i, gal_keys_coeff, lwe_sk_sqrt_list[i]);
-    }
+    // int sq_sk = sqrt(n);
+    // Ciphertext c_column;
+    // vector<Ciphertext> lwe_sk_sqrt_list(sq_sk);
+    // cout << "1\n";
+    // eval_gal.rotate_columns(c, gal_keys_coeff, c_column);
+    // for (int i = 0; i < sq_sk; i++) {
+    //     cout << i << endl;
+    //     eval_gal.rotate_rows(c, sq_sk * i, gal_keys_coeff, lwe_sk_sqrt_list[i]);
+    // }
 
 
     // Plaintext pl_1;
@@ -168,48 +162,78 @@ int main() {
 
     // TEST KEY SWITCH.....
 
+
+    auto coeff_modulus_switch = CoeffModulus::Create(ring_dim, { 28, 60 });
+    EncryptionParameters parms_switch = bfv_params;
+    parms_switch.set_coeff_modulus(coeff_modulus_switch);
+    SEALContext seal_context_switch = SEALContext(parms_switch, true, sec_level_type::none);
+
+
+    KeyGenerator new_key_keygen(seal_context_switch, n);
+    SecretKey new_key = new_key_keygen.secret_key();
+    KSwitchKeys ksk;
+    seal::util::ConstPolyIter secret_key_before(bfv_secret_key.data().data(), ring_dim, coeff_modulus.size());
+
+    new_key_keygen.generate_kswitch_keys(secret_key_before, 1, static_cast<KSwitchKeys &>(ksk), false);
+    ksk.parms_id() = seal_context.key_parms_id();
+
+    Evaluator eval_switch(seal_context_switch);
+
+
+
+
+
+
+
     // decryptor.decrypt(c, pl);
     // batch_encoder.decode(pl, msg);
     // cout << "Original Decrypt: " << msg << endl;
 
 
-    // for (int i = 0; i < ring_dim; i++) {
-    //     cout << new_key.data()[i] << " --> ";
-    //     new_key.data()[i] = (uint64_t) ((float(new_key.data()[i])) * float(268369921) / float(1152921504581419009));
+
+    // cout << "New SK: " << endl;
+    // for (int i = 0; i < 10; i++) {
+    //     // cout << new_key.data()[i] << " --> ";
+    //     // new_key.data()[i] = (uint64_t) ((float(new_key.data()[i])) * float(268369921) / float(1152921504581419009));
     //     cout << new_key.data()[i] << "  ";
     // }
     // cout << endl;
 
-    // while(seal_context.last_parms_id() != c.parms_id()){
-    //     evaluator.mod_switch_to_next_inplace(c);
-    // }
+    while(seal_context.last_parms_id() != c.parms_id()){
+        evaluator.mod_switch_to_next_inplace(c);
+    }
 
 
-    // modDownToPrime(c, ring_dim, 1152921504581419009, 268369921);
+    // 36028797017456641
+    // 1152921504606584833 / 32990138759887301
+
+    modDownToPrime(c, ring_dim, 1152921504581419009, 268369921);
     // for (int i = 0; i < ring_dim; i++) {
     //     cout << c.data(0)[i] << "  ";
     // }
     // cout << endl;
 
-    // Ciphertext copy_coeff = c;
-    // auto ct_in_iter = util::iter(copy_coeff);
-    // ct_in_iter += c.size() - 1;
-    // seal::util::set_zero_poly(ring_dim, 1, c.data(1)); // notice that the coeff_mod.size() is hardcoded to 1, thus this needs to be performed on the last level
+    Ciphertext copy_coeff = c;
+    auto ct_in_iter = util::iter(copy_coeff);
+    ct_in_iter += c.size() - 1;
+    seal::util::set_zero_poly(ring_dim, 1, c.data(1)); // notice that the coeff_mod.size() is hardcoded to 1, thus this needs to be performed on the last level
 
-    // evaluator.switch_key_inplace(c, *ct_in_iter, static_cast<const KSwitchKeys &>(ksk), 0, my_pool);
+    c.parms_id_ = seal_context_switch.last_parms_id();
+
+    eval_switch.switch_key_inplace(c, *ct_in_iter, static_cast<const KSwitchKeys &>(ksk), 0, my_pool);
 
 
-    // for (int i = 0; i < ring_dim; i++) {
-    //     cout << c.data(0)[i] << "  ";
-    // }
-    // cout << endl;
+    for (int i = 0; i < ring_dim; i++) {
+        cout << c.data(0)[i] << "  ";
+    }
+    cout << endl;
     
-    // Decryptor decryptor_new(seal_context, new_key);
+    Decryptor decryptor_new(seal_context_switch, new_key);
 
 
-    // decryptor_new.decrypt(c, pl);
-    // batch_encoder.decode(pl, msg);
-    // cout << "New Decrypt: " << msg << endl;
+    decryptor_new.decrypt(c, pl);
+    batch_encoder.decode(pl, msg);
+    cout << "New Decrypt: " << msg << endl;
 
 
 
