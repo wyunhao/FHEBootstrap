@@ -636,7 +636,7 @@ Ciphertext encryptLWEskUnderBFV(const SEALContext& context, const size_t& degree
 
 
 vector<regevCiphertext> extractRLWECiphertextToLWECiphertext(Ciphertext& rlwe_ct, const int ring_dim = poly_modulus_degree_glb,
-                                                             const int n = 1024, const int p = 65537, const int big_prime = 1152921504581419009) {
+                                                             const int n = 1024, const int p = 65537, const uint64_t big_prime = 1152921504581419009) {
     vector<regevCiphertext> results(ring_dim);
 
     prng_seed_type seed;
@@ -651,7 +651,7 @@ vector<regevCiphertext> extractRLWECiphertextToLWECiphertext(Ciphertext& rlwe_ct
         results[cnt].a = NativeVector(n);
         int ind = 0;
         for (int i = cnt; i >= 0 && ind < n; i--) {
-            float temp_f = ((float) rlwe_ct.data(1)[i]) * ((float) p) / ((float) big_prime);
+            float temp_f = ((float) rlwe_ct.data(1)[i]) * ((float) p) / ((long double) big_prime);
             uint32_t decimal = (temp_f - ((int) temp_f)) * 100;
             float rounding = dist(engine) < decimal ? 1 : 0;
 
@@ -662,7 +662,7 @@ vector<regevCiphertext> extractRLWECiphertextToLWECiphertext(Ciphertext& rlwe_ct
         }
 
         for (int i = ring_dim-1; i > ring_dim - n + cnt && ind < n; i--) {
-            float temp_f = ((float) rlwe_ct.data(1)[i]) * ((float) p) / ((float) big_prime);
+            float temp_f = ((float) rlwe_ct.data(1)[i]) * ((float) p) / ((long double) big_prime);
             uint32_t decimal = (temp_f - ((int) temp_f)) * 100;
             float rounding = dist(engine) < decimal ? 1 : 0;
 
@@ -672,7 +672,7 @@ vector<regevCiphertext> extractRLWECiphertextToLWECiphertext(Ciphertext& rlwe_ct
             ind++;
         }
 
-        float temp_f = ((float) rlwe_ct.data(0)[cnt]) * ((float) p) / ((float) big_prime);
+        float temp_f = ((float) rlwe_ct.data(0)[cnt]) * ((float) p) / ((long double) big_prime);
         uint32_t decimal = temp_f - ((int) temp_f) * 100;
         float rounding = dist(engine) < decimal ? 1 : 0;
 
