@@ -636,7 +636,7 @@ Ciphertext encryptLWEskUnderBFV(const SEALContext& context, const size_t& degree
 
 
 vector<regevCiphertext> extractRLWECiphertextToLWECiphertext(Ciphertext& rlwe_ct, const int ring_dim = poly_modulus_degree_glb,
-                                                             const int n = 1024, const int p = 65537, const int big_prime = 268369921) {
+                                                             const int n = 1024, const int p = 65537, const int big_prime = 1152921504581419009) {
     vector<regevCiphertext> results(ring_dim);
 
     prng_seed_type seed;
@@ -678,37 +678,6 @@ vector<regevCiphertext> extractRLWECiphertextToLWECiphertext(Ciphertext& rlwe_ct
 
         long temp = ((int) (temp_f + rounding)) % p;
         results[cnt].b = temp % ((int) p);
-    }
-
-    return results;
-}
-
-
-vector<regevCiphertext> extractRLWECiphertextToLWECiphertext_NoModSwitch(Ciphertext& rlwe_ct, const int ring_dim = poly_modulus_degree_glb,
-                                                             const int n = 1024, const int big_prime = 268369921) {
-    vector<regevCiphertext> results(ring_dim);
-
-    prng_seed_type seed;
-    for (auto &i : seed) {
-        i = random_uint64();
-    }
-    auto rng = std::make_shared<Blake2xbPRNGFactory>(Blake2xbPRNGFactory(seed));
-    RandomToStandardAdapter engine(rng->create());
-    uniform_int_distribution<uint32_t> dist(0, 100);
-
-    for (int cnt = 0; cnt < ring_dim; cnt++) {
-        results[cnt].a = NativeVector(n);
-        int ind = 0;
-        for (int i = cnt; i >= 0 && ind < n; i--) {
-            results[cnt].a[ind] = rlwe_ct.data(1)[i];
-            ind++;
-        }
-
-        for (int i = ring_dim-1; i > ring_dim - n + cnt && ind < n; i--) {
-            results[cnt].a[ind] = -rlwe_ct.data(1)[i];
-            ind++;
-        }
-        results[cnt].b = rlwe_ct.data(0)[cnt];
     }
 
     return results;
@@ -850,7 +819,7 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
 
     ////////////////////////////////////////////////// MANUAL MOD DOWN /////////////////////////////////////////////////
 
-    modDownToPrime(coeff, ring_dim, bigPrime, smallPrime);
+    // modDownToPrime(coeff, ring_dim, bigPrime, smallPrime);
 
 
     ////////////////////////////////////////////////// KEY SWITCHING ///////////////////////////////////////////////////
@@ -955,14 +924,14 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
         eval_coeff.transform_to_ntt_inplace(ct_sqrt_list[i+sq_ct]);
     }
 
-    vector<Plaintext> U_plain_list(ring_dim);
-    for (int iter = 0; iter < sq_ct; iter++) {
-        for (int j = 0; j < (int) ct_sqrt_list.size(); j++) {
-            vector<uint64_t> U_tmp = readUtemp(j*sq_ct + iter);
-            batch_encoder.encode(U_tmp, U_plain_list[iter * ct_sqrt_list.size() + j]);
-            evaluator.transform_to_ntt_inplace(U_plain_list[iter * ct_sqrt_list.size() + j], ct_sqrt_list[j].parms_id());
-        }
-    }
+    // vector<Plaintext> U_plain_list(ring_dim);
+    // for (int iter = 0; iter < sq_ct; iter++) {
+    //     for (int j = 0; j < (int) ct_sqrt_list.size(); j++) {
+    //         vector<uint64_t> U_tmp = readUtemp(j*sq_ct + iter);
+    //         batch_encoder.encode(U_tmp, U_plain_list[iter * ct_sqrt_list.size() + j]);
+    //         evaluator.transform_to_ntt_inplace(U_plain_list[iter * ct_sqrt_list.size() + j], ct_sqrt_list[j].parms_id());
+    //     }
+    // }
     time_end = chrono::high_resolution_clock::now();
     total_preprocess += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
 

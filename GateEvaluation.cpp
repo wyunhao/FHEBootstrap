@@ -104,7 +104,9 @@ int main() {
     auto lwe_sk = regevGenerateSecretKey(lwe_params);
     for (int i = 0; i < n; i++) {
         lwe_sk[i] = (int) new_key.data()[i] > p ? p-1 : new_key.data()[i];
+        cout << new_key.data()[i] << " ";
     }
+    cout << endl;
 
     seal::util::RNSIter new_key_rns(new_key.data().data(), ring_dim);
     ntt_negacyclic_harvey(new_key_rns, coeff_modulus.size(), seal_context.key_context_data()->small_ntt_tables());
@@ -114,15 +116,7 @@ int main() {
     vector<regevCiphertext> lwe_ct_list_1 = regevGeneratePublicKey_Mod3(lwe_params, lwe_sk, 0); // enc 0
     vector<regevCiphertext> lwe_ct_list_2 = regevGeneratePublicKey_Mod3(lwe_params, lwe_sk, 1); // enc 1
 
-    // regevDec_Mod3(msg, lwe_ct_list_1, lwe_sk, lwe_params);
-    // cout << "Input Ciphertex 1: \n" << msg << endl;
-    // regevDec_Mod3(msg, lwe_ct_list_2, lwe_sk, lwe_params);
-    // cout << "Input Ciphertex 2: \n" << msg << endl;
-
     vector<regevCiphertext> lwe_ct_list = preprocess_NAND(lwe_ct_list_1, lwe_ct_list_2, lwe_params);
-
-    // regevDec_Mod3(msg, lwe_ct_list, lwe_sk, lwe_params);
-    // cout << "Expected NAND result: \n" << msg << endl;
 
     ////////////////////////////////////////////// ENCRYPT SK UNDER BFV ////////////////////////////////////////////////
 
