@@ -754,9 +754,9 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
 
     Plaintext pl;
     vector<uint64_t> v(ring_dim);
-    decryptor.decrypt(result, pl);
-    batch_encoder.decode(pl, v);
-    cout << "Decrypt after evaluation: \n" << v << endl;
+    // decryptor.decrypt(result, pl);
+    // batch_encoder.decode(pl, v);
+    // cout << "Decrypt after evaluation: \n" << v << endl;
 
     Ciphertext range_check_res;
     time_start = chrono::high_resolution_clock::now();
@@ -887,9 +887,9 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
 
     Plaintext pl;
     vector<uint64_t> v(ring_dim);
-    decryptor.decrypt(result, pl);
-    batch_encoder.decode(pl, v);
-    cout << "Decrypt after evaluation: \n" << v << endl;
+    // decryptor.decrypt(result, pl);
+    // batch_encoder.decode(pl, v);
+    // cout << "Decrypt after evaluation: \n" << v << endl;
 
     Ciphertext range_check_res;
     time_start = chrono::high_resolution_clock::now();
