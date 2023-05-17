@@ -435,11 +435,11 @@ void Bootstrap_RangeCheck_PatersonStockmeyer_bigPrime(Ciphertext& ciphertext, co
     for (int j = 0; j < (int) kCTs.size(); j++) {
         evaluator.mod_switch_to_inplace(kCTs[j], kToMCTs[kToMCTs.size()-1].parms_id());
     }
-    cout << "Noise for last: " << decryptor.invariant_noise_budget(kToMCTs[kToMCTs.size()-1]) << " bits\n";
+    // cout << "Noise for last: " << decryptor.invariant_noise_budget(kToMCTs[kToMCTs.size()-1]) << " bits\n";
     for (int j = 0; j < (int) kToMCTs.size(); j++) {
         evaluator.mod_switch_to_next_inplace(kToMCTs[j]);
     }
-    cout << "Noise for last: " << decryptor.invariant_noise_budget(kToMCTs[kToMCTs.size()-1]) << " bits\n";
+    // cout << "Noise for last: " << decryptor.invariant_noise_budget(kToMCTs[kToMCTs.size()-1]) << " bits\n";
     
 
     Ciphertext temp_relin(context);
@@ -529,7 +529,7 @@ void Bootstrap_RangeCheck_PatersonStockmeyer(Ciphertext& ciphertext, const Ciphe
             evaluator.mod_switch_to_next_inplace(kToMCTs[j]);
         }
     // }
-    cout << "Noise for last: " << decryptor.invariant_noise_budget(kToMCTs[kToMCTs.size()-1]) << " bits\n";
+    // cout << "Noise for last: " << decryptor.invariant_noise_budget(kToMCTs[kToMCTs.size()-1]) << " bits\n";
 
     Ciphertext temp_relin(context);
     // int third = 0;
