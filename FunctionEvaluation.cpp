@@ -108,7 +108,7 @@ int main() {
     auto lwe_params = regevParam(n, p, 1.3, ring_dim); 
     auto lwe_sk = regevGenerateSecretKey(lwe_params);
     for (int i = 0; i < n; i++) {
-        lwe_sk[i] = (int) new_key.data()[i] > p ? p-1 : new_key.data()[i];
+        lwe_sk[i] = (uint64_t) new_key.data()[i] > (uint64_t) p ? p-1 : new_key.data()[i];
     }
 
     seal::util::RNSIter new_key_rns(new_key.data().data(), ring_dim);

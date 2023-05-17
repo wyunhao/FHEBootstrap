@@ -106,7 +106,7 @@ int main() {
     auto lwe_params = regevParam(n, p, 1.3, ring_dim); 
     auto lwe_sk = regevGenerateSecretKey(lwe_params);
     for (int i = 0; i < n; i++) {
-        lwe_sk[i] = (int) new_key.data()[i] > p ? p-1 : new_key.data()[i];
+        lwe_sk[i] = (uint64_t) new_key.data()[i] > (uint64_t) p ? p-1 : new_key.data()[i];
     }
     cout << endl;
 
@@ -128,7 +128,7 @@ int main() {
     vector<regevCiphertext> lwe_ct_results = bootstrap_bigPrime(lwe_ct_list, lwe_sk_encrypted, seal_context, seal_context_last, relin_keys, gal_keys,
                                                                 gal_keys_coeff, ring_dim, n, p, ksk, rangeCheckIndices_squareRoot_20, my_pool, bfv_secret_key,
                                                                 q_shift_constant, 0, false, false, bootstrap_param.firstLevelDegree, bootstrap_param.secondLevelDegree,
-                                                                1152921504581419009);
+                                                                1152921504581877761);
 
 
     regevDec_Value(msg, lwe_ct_results, lwe_sk, lwe_params, bootstrap_param.errorRange);

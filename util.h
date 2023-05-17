@@ -636,7 +636,7 @@ Ciphertext encryptLWEskUnderBFV(const SEALContext& context, const size_t& degree
 
 
 vector<regevCiphertext> extractRLWECiphertextToLWECiphertext(Ciphertext& rlwe_ct, const int ring_dim = poly_modulus_degree_glb,
-                                                             const int n = 1024, const int p = 65537, const uint64_t big_prime = 1152921504581419009) {
+                                                             const int n = 1024, const int p = 65537, const uint64_t big_prime = 1152921504589938689) {
     vector<regevCiphertext> results(ring_dim);
 
     prng_seed_type seed;
@@ -720,7 +720,7 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
                                            const vector<uint64_t>& rangeCheckIndices, const MemoryPoolHandle& my_pool, const SecretKey& bfv_secret_key,
                                            const vector<uint64_t>& q_shift_constant, const int f_zero = 0, const bool gateEval = false,
                                            const bool skip_first_odd = true, const int firstDegree = 256, const int secondDegree = 256,
-                                           const uint64_t bigPrime = 268369921, const uint64_t smallPrime = 268369921) {
+                                           const uint64_t bigPrime = 1152921504581877761, const uint64_t smallPrime = 268369921) {
     chrono::high_resolution_clock::time_point time_start, time_end;
     uint64_t total_preprocess = 0, total_online = 0;
 
@@ -747,7 +747,7 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
     time_end = chrono::high_resolution_clock::now();
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for evaluation: " << total_online << endl;
-    cout << "Noise: " << decryptor.invariant_noise_budget(result) << " bits\n";
+    // cout << "Noise: " << decryptor.invariant_noise_budget(result) << " bits\n";
 
     // evaluator.mod_switch_to_next_inplace(result);
     // cout << "Noise after mod down: " << decryptor.invariant_noise_budget(result) << " bits\n";
@@ -767,9 +767,9 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for rangecheck: " << total_online << endl;
 
-    decryptor.decrypt(range_check_res, pl);
-    batch_encoder.decode(pl, v);
-    cout << "Decrypt after rangeCheck: \n" << v << endl;
+    // decryptor.decrypt(range_check_res, pl);
+    // batch_encoder.decode(pl, v);
+    // cout << "Decrypt after rangeCheck: \n" << v << endl;
 
     ////////////////////////////////////////// SLOT TO COEFFICIENT /////////////////////////////////////////////////////
 
@@ -809,12 +809,12 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for slotToCoeff: " << total_online << endl;
 
-    cout << "PLAINTEX OF SLOTTOCOEFF\n";
-    decryptor.decrypt(coeff, pl);
-    for (int i = 0; i < ring_dim; i++) {
-      cout << pl[i] << ",";
-    }
-    cout << endl;
+    // cout << "PLAINTEX OF SLOTTOCOEFF\n";
+    // decryptor.decrypt(coeff, pl);
+    // for (int i = 0; i < ring_dim; i++) {
+    //   cout << pl[i] << ",";
+    // }
+    // cout << endl;
 
 
     ////////////////////////////////////////////////// MANUAL MOD DOWN /////////////////////////////////////////////////
@@ -839,7 +839,7 @@ vector<regevCiphertext> bootstrap_bigPrime(vector<regevCiphertext>& lwe_ct_list,
 
     // cout << "Noise before extraction: " << decryptor.invariant_noise_budget(coeff) << " bits\n";
 
-    vector<regevCiphertext> lwe_ct_results = extractRLWECiphertextToLWECiphertext(coeff, ring_dim, n, p);
+    vector<regevCiphertext> lwe_ct_results = extractRLWECiphertextToLWECiphertext(coeff, ring_dim, n, p, bigPrime);
     time_end = chrono::high_resolution_clock::now();
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for Extraction: " << total_online << endl;
@@ -900,9 +900,9 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for rangecheck: " << total_online << endl;
 
-    decryptor.decrypt(range_check_res, pl);
-    batch_encoder.decode(pl, v);
-    cout << "Decrypt after rangeCheck: \n" << v << endl;
+    // decryptor.decrypt(range_check_res, pl);
+    // batch_encoder.decode(pl, v);
+    // cout << "Decrypt after rangeCheck: \n" << v << endl;
 
     ////////////////////////////////////////// SLOT TO COEFFICIENT /////////////////////////////////////////////////////
 
@@ -936,18 +936,18 @@ vector<regevCiphertext> bootstrap(vector<regevCiphertext>& lwe_ct_list, Cipherte
     total_preprocess += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
 
     time_start = chrono::high_resolution_clock::now();
-    // Ciphertext coeff = slotToCoeff(seal_context, ct_sqrt_list, U_plain_list, gal_keys_coeff, ring_dim);
+    // Ciphertext coeff = slotToCoeff(seal_context, seal_context_last, ct_sqrt_list, U_plain_list, gal_keys_coeff, ring_dim);
     Ciphertext coeff = slotToCoeff_WOPrepreocess(seal_context, seal_context_last, ct_sqrt_list, gal_keys_coeff, ring_dim);
     time_end = chrono::high_resolution_clock::now();
     total_online += chrono::duration_cast<chrono::microseconds>(time_end - time_start).count();
     cout << "TOTAL TIME for slotToCoeff: " << total_online << endl;
 
-    cout << "PLAINTEX OF SLOTTOCOEFF\n";
-    decryptor.decrypt(coeff, pl);
-    for (int i = 0; i < ring_dim; i++) {
-      cout << pl[i] << ",";
-    }
-    cout << endl;
+    // cout << "PLAINTEX OF SLOTTOCOEFF\n";
+    // decryptor.decrypt(coeff, pl);
+    // for (int i = 0; i < ring_dim; i++) {
+    //   cout << pl[i] << ",";
+    // }
+    // cout << endl;
 
     ////////////////////////////////////////////////// KEY SWITCHING ///////////////////////////////////////////////////
 
